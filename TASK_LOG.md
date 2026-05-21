@@ -84,6 +84,14 @@ Catatan ini dipakai sebagai laporan kerja ringan setiap selesai revisi. Formatny
 - Menambahkan empty state yang jelas saat scene belum memiliki mapping SRT.
 - Menambahkan status di Preview & Render untuk jumlah scene yang sudah mapped dan jumlah SRT cue yang sudah assigned.
 
+### Visual SRT timing experiment
+
+- Membuat branch eksperimen `experiment/srt-visual-offsets` dari checkpoint SRT workflow.
+- Menambahkan visual start offset per scene agar image bisa muncul sebelum cue SRT pertama.
+- Menambahkan end hold per scene agar image bisa tetap tampil setelah cue SRT terakhir.
+- Manual duration override di SRT mode sekarang tetap berbasis start cue/offset, bukan jatuh ke timing sequential lama.
+- Memperbaiki input angka duration/offset/hold agar bisa dikosongkan saat diedit dan baru di-clamp saat blur atau Enter.
+
 ### Verification
 
 - `npm run build` berhasil.

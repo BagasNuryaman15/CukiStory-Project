@@ -16,7 +16,7 @@ export function CukiStoryComposition({project}: {project: CukiProject}) {
         const srtTiming = isSrtMode ? getSceneSrtTiming(scene, project.srtCues) : null;
         const durationInFrames = Math.max(1, Math.round((srtTiming?.duration ?? scene.duration) * project.fps));
         const from = srtTiming ? Math.round(srtTiming.start * project.fps) : currentFrame;
-        if (!srtTiming) currentFrame += durationInFrames;
+        currentFrame = Math.max(currentFrame, from + durationInFrames);
         return (
           <Sequence key={scene.id} from={from} durationInFrames={durationInFrames}>
             <Scene

@@ -63,6 +63,8 @@ export type CukiScene = {
   note?: string;
   srtCueStartIndex?: number | null;
   srtCueEndIndex?: number | null;
+  srtStartOffset?: number;
+  srtEndHold?: number;
   manualDurationOverride?: boolean;
   effect: ImageEffect;
   transition: TransitionType;

@@ -59,17 +59,27 @@ export function getSceneSrtCues(scene: Pick<CukiScene, "srtCueStartIndex" | "srt
 }
 
 export function getSceneSrtTiming(scene: CukiScene, cues: SrtCue[] | undefined) {
-  if (scene.manualDurationOverride) return null;
-
   const sceneCues = getSceneSrtCues(scene, cues);
   if (sceneCues.length === 0) return null;
 
-  const start = Math.min(...sceneCues.map((cue) => cue.start));
-  const end = Math.max(...sceneCues.map((cue) => cue.end));
+  const baseStart = Math.min(...sceneCues.map((cue) => cue.start));
+  const baseEnd = Math.max(...sceneCues.map((cue) => cue.end));
+  const startOffset = Number.isFinite(scene.srtStartOffset) ? scene.srtStartOffset ?? 0 : 0;
+  const endHold = Number.isFinite(scene.srtEndHold) ? Math.max(0, scene.srtEndHold ?? 0) : 0;
+  const start = Math.max(0, baseStart + startOffset);
+  const automaticEnd = Math.max(start + 0.1, baseEnd + endHold);
+  const end = scene.manualDurationOverride && Number.isFinite(scene.duration)
+    ? Math.max(start + 0.1, start + scene.duration)
+    : automaticEnd;
+
   return {
     start,
     end,
     duration: Math.max(0.1, end - start),
+    baseStart,
+    baseEnd,
+    startOffset,
+    endHold,
     cues: sceneCues,
   };
 }
@@ -99,6 +109,8 @@ export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {
         ...scene,
         srtCueStartIndex: null,
         srtCueEndIndex: null,
+        srtStartOffset: scene.srtStartOffset ?? -0.2,
+        srtEndHold: scene.srtEndHold ?? 0.35,
         manualDurationOverride: false,
       };
     }
@@ -120,7 +132,9 @@ export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {
       ...scene,
       srtCueStartIndex: sortedCues[startCue].index,
       srtCueEndIndex: sortedCues[endCue].index,
-      duration,
+      srtStartOffset: scene.srtStartOffset ?? -0.2,
+      srtEndHold: scene.srtEndHold ?? 0.35,
+      duration: duration + Math.abs(Math.min(0, scene.srtStartOffset ?? -0.2)) + Math.max(0, scene.srtEndHold ?? 0.35),
       timingSource: "synced" as const,
       manualDurationOverride: false,
     };

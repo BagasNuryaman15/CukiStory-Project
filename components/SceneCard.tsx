@@ -1,5 +1,6 @@
 "use client";
 
+import {useEffect, useState} from "react";
 import type {AudioMode, CukiScene, SrtCue} from "@/lib/types";
 import {transitionDurations} from "@/lib/presets";
 import {formatShortTimestamp, getSceneSrtCues, getSceneSrtTiming} from "@/lib/srt";
@@ -45,6 +46,14 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
       srtCueEndIndex: nextEnd,
       timingSource: nextStart != null && nextEnd != null ? "synced" as const : scene.timingSource,
     };
+    const timing = getSceneSrtTiming(nextScene, srtCues);
+    onChange({
+      ...nextScene,
+      duration: timing && !nextScene.manualDurationOverride ? timing.duration : nextScene.duration,
+    });
+  }
+
+  function updateVisualTiming(nextScene: CukiScene) {
     const timing = getSceneSrtTiming(nextScene, srtCues);
     onChange({
       ...nextScene,
@@ -116,19 +125,21 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
                   <input
                     type="checkbox"
                     checked={Boolean(scene.manualDurationOverride)}
-                    onChange={(event) => onChange({...scene, manualDurationOverride: event.target.checked})}
+                    onChange={(event) => {
+                      const nextScene = {...scene, manualDurationOverride: event.target.checked};
+                      const timing = getSceneSrtTiming(nextScene, srtCues);
+                      onChange({...nextScene, duration: timing?.duration ?? scene.duration, timingSource: event.target.checked ? "manual" : "synced"});
+                    }}
                   />
                   Manual duration override
                 </label>
               ) : null}
-              <input
-                type="number"
+              <NumberInput
+                value={effectiveDuration}
                 min={0.1}
                 step={0.1}
                 disabled={isSrtMode && !scene.manualDurationOverride}
-                value={Number(effectiveDuration.toFixed(2))}
-                onChange={(event) => onChange({...scene, duration: Number(event.target.value), timingSource: "manual"})}
-                className="studio-input w-full rounded-xl px-3 py-2 text-sm"
+                onCommit={(duration) => onChange({...scene, duration, timingSource: "manual", manualDurationOverride: isSrtMode ? true : scene.manualDurationOverride})}
               />
               <p className="mt-2 text-xs font-bold text-studio-muted">{getTimingSourceLabel(scene, isSrtMode, Boolean(srtTiming))}</p>
             </Field>
@@ -184,6 +195,28 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
                   </select>
                 </Field>
               </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Field label="Visual start offset">
+                  <NumberInput
+                    value={scene.srtStartOffset ?? -0.2}
+                    min={-10}
+                    max={10}
+                    step={0.1}
+                    onCommit={(srtStartOffset) => updateVisualTiming({...scene, srtStartOffset})}
+                  />
+                  <p className="mt-2 text-xs text-studio-muted">Negative starts the image before the first subtitle cue.</p>
+                </Field>
+                <Field label="End hold">
+                  <NumberInput
+                    value={scene.srtEndHold ?? 0.35}
+                    min={0}
+                    max={10}
+                    step={0.1}
+                    onCommit={(srtEndHold) => updateVisualTiming({...scene, srtEndHold})}
+                  />
+                  <p className="mt-2 text-xs text-studio-muted">Keeps the image visible after the last mapped cue.</p>
+                </Field>
+              </div>
               <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-studio-muted">Calculated from SRT</p>
                 <p className="mt-2 text-sm font-bold text-white">
@@ -191,6 +224,11 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
                     ? `${formatShortTimestamp(srtTiming.start)} - ${formatShortTimestamp(srtTiming.end)} · ${formatSeconds(srtTiming.duration)}`
                     : "No SRT timing mapped yet."}
                 </p>
+                {srtTiming ? (
+                  <p className="mt-2 text-xs text-studio-muted">
+                    Cue timing: {formatShortTimestamp(srtTiming.baseStart)} - {formatShortTimestamp(srtTiming.baseEnd)}
+                  </p>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -257,6 +295,71 @@ function Field({label, children}: {label: string; children: React.ReactNode}) {
       {children}
     </label>
   );
+}
+
+function NumberInput({
+  value,
+  onCommit,
+  min,
+  max,
+  step = 0.1,
+  disabled,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(formatInputValue(value));
+
+  useEffect(() => {
+    if (document.activeElement instanceof HTMLInputElement && document.activeElement.value === draft) return;
+    setDraft(formatInputValue(value));
+  }, [draft, value]);
+
+  function commit() {
+    if (draft.trim() === "" || draft === "-" || draft === "." || draft === "-.") {
+      setDraft(formatInputValue(value));
+      return;
+    }
+
+    const numericValue = Number(draft);
+    if (!Number.isFinite(numericValue)) {
+      setDraft(formatInputValue(value));
+      return;
+    }
+
+    const clamped = Math.min(max ?? numericValue, Math.max(min ?? numericValue, numericValue));
+    const rounded = Math.round(clamped * 100) / 100;
+    setDraft(formatInputValue(rounded));
+    onCommit(rounded);
+  }
+
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      disabled={disabled}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        }
+      }}
+      className="studio-input w-full rounded-xl px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+    />
+  );
+}
+
+function formatInputValue(value: number) {
+  if (!Number.isFinite(value)) return "";
+  return String(Math.round(value * 100) / 100);
 }
 
 function SmallButton({children, onClick, disabled}: {children: React.ReactNode; onClick: () => void; disabled?: boolean}) {
