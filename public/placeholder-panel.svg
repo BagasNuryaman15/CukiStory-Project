@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920" role="img" aria-label="CukiStory placeholder panel">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151a32"/>
+      <stop offset="0.5" stop-color="#090b1c"/>
+      <stop offset="1" stop-color="#13283a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="55%">
+      <stop offset="0" stop-color="#38d8ff" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#38d8ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1080" height="1920" fill="url(#bg)"/>
+  <rect width="1080" height="1920" fill="url(#glow)"/>
+  <rect x="88" y="120" width="904" height="1680" rx="72" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="10" stroke-dasharray="28 26"/>
+  <text x="540" y="900" text-anchor="middle" fill="#f7f7fb" font-family="Arial, sans-serif" font-size="68" font-weight="800">Upload Panel</text>
+  <text x="540" y="992" text-anchor="middle" fill="#9aa3bc" font-family="Arial, sans-serif" font-size="38">1080 x 1920 vertical comic image</text>
+</svg>

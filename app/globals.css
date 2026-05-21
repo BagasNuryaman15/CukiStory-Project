@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --font-display: "Avenir Next Condensed", "Trebuchet MS", "Arial Black", sans-serif;
+  --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #070817;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  color: #f7f7fb;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(56, 216, 255, 0.2), transparent 32rem),
+    radial-gradient(circle at 85% 5%, rgba(255, 79, 216, 0.18), transparent 32rem),
+    radial-gradient(circle at 50% 95%, rgba(95, 124, 255, 0.22), transparent 34rem),
+    linear-gradient(135deg, #070817 0%, #0d1021 48%, #08091a 100%);
+  font-family: var(--font-sans), ui-sans-serif, system-ui;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.glass-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(145deg, rgba(21, 26, 50, 0.9), rgba(10, 12, 26, 0.86));
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(22px);
+}
+
+.studio-input {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(7, 8, 23, 0.78);
+  color: #f7f7fb;
+  outline: none;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.studio-input:focus {
+  border-color: rgba(56, 216, 255, 0.72);
+  box-shadow: 0 0 0 3px rgba(56, 216, 255, 0.1);
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-quiet,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  font-weight: 800;
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, #38d8ff, #5f7cff 52%, #ff4fd8);
+  color: white;
+  box-shadow: 0 12px 42px rgba(95, 124, 255, 0.26);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.btn-secondary:hover,
+.btn-quiet:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.btn-quiet {
+  background: rgba(255, 255, 255, 0.05);
+  color: #d9def0;
+}
+
+.btn-danger {
+  border: 1px solid rgba(248, 113, 113, 0.36);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fecaca;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.guidance-card {
+  border: 1px solid rgba(56, 216, 255, 0.16);
+  background: rgba(56, 216, 255, 0.07);
+  color: #c9f4ff;
+}
+
+.soft-warning {
+  border: 1px solid rgba(255, 209, 102, 0.22);
+  background: rgba(255, 209, 102, 0.08);
+  color: #ffe8aa;
+}
+
+.neon-border {
+  position: relative;
+}
+
+.neon-border::before {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(56, 216, 255, 0.7), rgba(95, 124, 255, 0.15), rgba(255, 79, 216, 0.55));
+  content: "";
+}
