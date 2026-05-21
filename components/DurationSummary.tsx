@@ -2,9 +2,29 @@
 
 import type {CukiProject} from "@/lib/types";
 import {getDurationDifference, getTotalSceneDuration} from "@/lib/timing";
+import {getAssignedSrtCueIndexes, getSceneSrtTiming, getSrtDuration} from "@/lib/srt";
 import {formatSeconds} from "@/lib/utils";
 
 export function DurationSummary({project}: {project: CukiProject}) {
+  if (project.audioMode === "fullVoSrt") {
+    const cues = project.srtCues ?? [];
+    const srtDuration = getSrtDuration(cues);
+    const mappedDuration = project.scenes.reduce((total, scene) => total + (getSceneSrtTiming(scene, cues)?.duration ?? 0), 0);
+    const assignedCueIndexes = getAssignedSrtCueIndexes(project.scenes);
+    const assignedCount = cues.filter((cue) => assignedCueIndexes.has(cue.index)).length;
+    const unassignedCount = Math.max(0, cues.length - assignedCount);
+    const audioSrtDiff = project.audioDuration && srtDuration ? srtDuration - project.audioDuration : 0;
+
+    return (
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Panel label="Audio Duration" value={project.audioDuration ? formatSeconds(project.audioDuration) : "Add audio"} tone={!project.audioDuration ? "guide" : "normal"} />
+        <Panel label="SRT Duration" value={srtDuration ? formatSeconds(srtDuration) : "Add SRT"} tone={!srtDuration ? "guide" : Math.abs(audioSrtDiff) > 0.75 ? "warn" : "normal"} />
+        <Panel label="Scene Mapped" value={formatSeconds(mappedDuration)} tone="normal" />
+        <Panel label="Unassigned Cues" value={`${unassignedCount}`} tone={unassignedCount > 0 ? "warn" : "normal"} />
+      </div>
+    );
+  }
+
   const total = getTotalSceneDuration(project.scenes);
   const diff = getDurationDifference(project);
   const mismatch = project.audioDuration !== null && Math.abs(diff) > 0.5;

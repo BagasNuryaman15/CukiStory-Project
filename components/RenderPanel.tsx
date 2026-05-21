@@ -3,6 +3,7 @@
 import {useState} from "react";
 import type {CukiProject} from "@/lib/types";
 import {getDurationDifference} from "@/lib/timing";
+import {getAssignedSrtCueIndexes, getSceneSrtTiming, getSrtDuration} from "@/lib/srt";
 import {downloadBlob, formatSeconds} from "@/lib/utils";
 
 export function RenderPanel({project, onSave}: {project: CukiProject; onSave: () => void}) {
@@ -66,13 +67,28 @@ function validateForRender(project: CukiProject) {
   const warnings: string[] = [];
   if (!project.audioUrl) warnings.push("No VO audio uploaded yet.");
   if (project.audioUrl && !project.audioDuration) warnings.push("Load audio duration before final timing.");
+  if (project.audioMode === "fullVoSrt") {
+    const cues = project.srtCues ?? [];
+    const srtDuration = getSrtDuration(cues);
+    const assigned = getAssignedSrtCueIndexes(project.scenes);
+    const assignedCueCount = cues.filter((cue) => assigned.has(cue.index)).length;
+    if (cues.length === 0) warnings.push("No SRT cues parsed yet.");
+    if (cues.length > 0 && assignedCueCount < cues.length) warnings.push(`${cues.length - assignedCueCount} SRT cue${cues.length - assignedCueCount === 1 ? "" : "s"} are not assigned to any scene.`);
+    const unmappedScenes = project.scenes.filter((scene) => !getSceneSrtTiming(scene, cues));
+    if (unmappedScenes.length > 0) warnings.push(`${unmappedScenes.length} scene${unmappedScenes.length === 1 ? "" : "s"} are not mapped to SRT cues.`);
+    if (project.audioDuration && srtDuration > 0) {
+      const difference = srtDuration - project.audioDuration;
+      if (difference > 0.75) warnings.push(`SRT is ${formatSeconds(difference)} longer than audio.`);
+      if (difference < -0.75) warnings.push(`SRT ends ${formatSeconds(Math.abs(difference))} before audio ends.`);
+    }
+  }
   if (project.scenes.length === 0) warnings.push("Add at least one scene.");
   project.scenes.forEach((scene, index) => {
     if (!scene.imageUrl) warnings.push(`Scene ${index + 1}: add a panel image.`);
-    if (!scene.subtitle.trim()) warnings.push(`Scene ${index + 1}: add subtitle text.`);
-    if (scene.duration < 2) warnings.push(`Scene ${index + 1}: duration is shorter than 2 seconds.`);
+    if (project.audioMode !== "fullVoSrt" && !scene.subtitle.trim()) warnings.push(`Scene ${index + 1}: add subtitle text.`);
+    if (project.audioMode !== "fullVoSrt" && scene.duration < 2) warnings.push(`Scene ${index + 1}: duration is shorter than 2 seconds.`);
   });
-  if (project.audioDuration && Math.abs(getDurationDifference(project)) > 0.5) {
+  if (project.audioMode !== "fullVoSrt" && project.audioDuration && Math.abs(getDurationDifference(project)) > 0.5) {
     const difference = getDurationDifference(project);
     warnings.push(`Scene timing is ${formatSeconds(Math.abs(difference))} ${difference < 0 ? "shorter" : "longer"} than VO.`);
   }

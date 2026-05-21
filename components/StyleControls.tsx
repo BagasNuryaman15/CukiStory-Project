@@ -26,6 +26,7 @@ export function StyleControls({
         subtitleStyle: project.globalSubtitleStyle,
         effect: project.globalImageEffect,
         transition: project.globalTransition,
+        transitionDuration: project.transitionDuration,
       })),
     });
   }
@@ -49,6 +50,7 @@ export function StyleControls({
         subtitleStyle: globalSubtitleStyle,
         effect: globalImageEffect,
         transition: globalTransition,
+        transitionDuration: 0.25,
       })),
     });
   }
@@ -60,13 +62,7 @@ export function StyleControls({
           <Field label="Subtitle Style">
             <SubtitleStylePicker
               value={project.globalSubtitleStyle}
-              onChange={(globalSubtitleStyle) =>
-                onChange({
-                  ...project,
-                  globalSubtitleStyle,
-                  scenes: project.scenes.map((scene) => ({...scene, subtitleStyle: globalSubtitleStyle})),
-                })
-              }
+              onChange={(globalSubtitleStyle) => onChange({...project, globalSubtitleStyle})}
             />
           </Field>
 
@@ -116,11 +112,7 @@ export function StyleControls({
               value={project.globalImageEffect}
               onChange={(event) => {
                 const globalImageEffect = event.target.value as ImageEffect;
-                onChange({
-                  ...project,
-                  globalImageEffect,
-                  scenes: project.scenes.map((scene) => ({...scene, effect: globalImageEffect})),
-                });
+                onChange({...project, globalImageEffect});
               }}
               className="studio-input w-full rounded-xl px-3 py-2 text-sm"
             >
@@ -128,7 +120,7 @@ export function StyleControls({
                 <option key={effect.value} value={effect.value}>{effect.label}</option>
               ))}
             </select>
-            <p className="mt-2 text-xs text-studio-muted">Updates all scene motion effects.</p>
+            <p className="mt-2 text-xs text-studio-muted">Used as the default for new scenes. Use Apply Settings to update existing scenes.</p>
           </Field>
 
           <Field label="Motion Speed">
@@ -151,15 +143,9 @@ export function StyleControls({
           <Field label="Transition Type">
             <TransitionPicker
               value={project.globalTransition}
-              onChange={(globalTransition) =>
-                onChange({
-                  ...project,
-                  globalTransition,
-                  scenes: project.scenes.map((scene) => ({...scene, transition: globalTransition})),
-                })
-              }
+              onChange={(globalTransition) => onChange({...project, globalTransition})}
             />
-            <p className="mt-2 text-xs text-studio-muted">Updates all scene transitions.</p>
+            <p className="mt-2 text-xs text-studio-muted">Used as the default for new scenes. Existing scenes keep their own transition until applied.</p>
           </Field>
 
           <Field label="Transition Duration">
@@ -172,6 +158,7 @@ export function StyleControls({
                 <option key={duration.value} value={duration.value}>{duration.label}</option>
               ))}
             </select>
+            <p className="mt-2 text-xs text-studio-muted">Default duration for new scene transitions.</p>
           </Field>
         </div>
       </SettingCard>

@@ -13,6 +13,7 @@ export function Scene({
   subtitleMode,
   subtitleSize,
   subtitlePosition,
+  showSubtitle = true,
 }: {
   scene: CukiScene;
   durationInFrames: number;
@@ -22,6 +23,7 @@ export function Scene({
   subtitleMode: SubtitleMode;
   subtitleSize: SubtitleSize;
   subtitlePosition: SubtitlePosition;
+  showSubtitle?: boolean;
 }) {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
@@ -47,7 +49,7 @@ export function Scene({
           <div style={{color: "rgba(255,255,255,0.6)", fontSize: 52, fontWeight: 800}}>Missing Image</div>
         </AbsoluteFill>
       )}
-      {scene.subtitle.trim() ? (
+      {showSubtitle && scene.subtitle.trim() ? (
         <Subtitle
           text={scene.subtitle}
           stylePreset={scene.subtitleStyle}

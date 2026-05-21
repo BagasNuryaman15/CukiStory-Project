@@ -1,7 +1,8 @@
 "use client";
 
-import type {CukiScene, ImageEffect, SubtitleStyle, TransitionType} from "@/lib/types";
+import type {AudioMode, CukiScene, ImageEffect, SrtCue, SubtitleStyle, TransitionType} from "@/lib/types";
 import {createScene} from "@/lib/storage";
+import {autoMapSrtToScenes} from "@/lib/srt";
 import {createId, reorderScenes} from "@/lib/utils";
 import {SceneCard} from "./SceneCard";
 
@@ -9,6 +10,8 @@ export function SceneEditor({
   scenes,
   onChange,
   sceneDefaults,
+  audioMode,
+  srtCues = [],
 }: {
   scenes: CukiScene[];
   onChange: (scenes: CukiScene[]) => void;
@@ -17,6 +20,8 @@ export function SceneEditor({
     transition: TransitionType;
     effect: ImageEffect;
   };
+  audioMode?: AudioMode;
+  srtCues?: SrtCue[];
 }) {
   function addScene() {
     onChange([...scenes, createScene(scenes.length + 1, sceneDefaults)]);
@@ -45,6 +50,14 @@ export function SceneEditor({
     onChange(reorderScenes(next));
   }
 
+  function clearMapping() {
+    onChange(scenes.map((scene) => ({...scene, srtCueStartIndex: null, srtCueEndIndex: null, manualDurationOverride: false})));
+  }
+
+  function autoMap() {
+    onChange(reorderScenes(autoMapSrtToScenes(scenes, srtCues)));
+  }
+
   return (
     <section className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -56,6 +69,25 @@ export function SceneEditor({
           Add Scene
         </button>
       </div>
+
+      {audioMode === "fullVoSrt" ? (
+        <div className="guidance-card rounded-2xl p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="font-extrabold text-white">SRT Mapping</p>
+              <p className="mt-1 text-sm">Map subtitle cue ranges to image scenes. Scene duration is controlled by mapped SRT timing unless manual override is enabled.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={autoMap} disabled={srtCues.length === 0 || scenes.length === 0} className="btn-secondary px-4 py-3 text-sm">
+                Auto Map SRT to Scenes
+              </button>
+              <button onClick={clearMapping} disabled={scenes.length === 0} className="btn-quiet px-4 py-3 text-sm">
+                Clear Mapping
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {scenes.length === 0 ? (
         <div className="rounded-[1.5rem] border border-dashed border-white/15 bg-white/[0.03] p-10 text-center">
@@ -76,6 +108,8 @@ export function SceneEditor({
               onDelete={() => deleteScene(index)}
               onMoveUp={() => moveScene(index, -1)}
               onMoveDown={() => moveScene(index, 1)}
+              audioMode={audioMode}
+              srtCues={srtCues}
             />
           ))}
         </div>

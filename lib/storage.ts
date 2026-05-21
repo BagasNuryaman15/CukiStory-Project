@@ -25,10 +25,11 @@ export function saveProject(project: CukiProject) {
   if (typeof window === "undefined") return project;
   const projects = getProjects();
   const updatedProject = normalizeProject({...project, scenes: reorderScenes(project.scenes), updatedAt: new Date().toISOString()});
+  const storageProject = stripLargeSessionFiles(updatedProject);
   const nextProjects = projects.some((item) => item.id === project.id)
-    ? projects.map((item) => (item.id === project.id ? updatedProject : item))
-    : [updatedProject, ...projects];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProjects));
+    ? projects.map((item) => (item.id === project.id ? storageProject : item))
+    : [storageProject, ...projects];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProjects.map(stripLargeSessionFiles)));
   return updatedProject;
 }
 
@@ -50,8 +51,11 @@ export function createProject(title: string) {
     fps: 30,
     width: 1080,
     height: 1920,
+    audioMode: "fullVoEstimated",
     audioUrl: null,
     audioDuration: null,
+    srtCues: [],
+    srtFileName: null,
     globalSubtitleStyle: "cukiBoldMeme",
     globalImageEffect: "slowZoomIn",
     globalTransition: "hardCut",
@@ -82,8 +86,13 @@ export function createScene(
     subtitle: "",
     duration: 3,
     timingSource: "estimated",
+    note: "",
+    srtCueStartIndex: null,
+    srtCueEndIndex: null,
+    manualDurationOverride: false,
     effect: defaults?.effect ?? "slowZoomIn",
     transition: defaults?.transition ?? "hardCut",
+    transitionDuration: 0.25,
     subtitleStyle: defaults?.subtitleStyle ?? "cukiBoldMeme",
   };
 }
@@ -95,7 +104,10 @@ function normalizeProject(project: CukiProject): CukiProject {
     fps: 30,
     width: 1080,
     height: 1920,
+    audioMode: project.audioMode ?? "fullVoEstimated",
     globalSubtitleStyle: project.globalSubtitleStyle ?? "cukiBoldMeme",
+    srtCues: project.srtCues ?? [],
+    srtFileName: project.srtFileName ?? null,
     globalImageEffect: project.globalImageEffect ?? "slowZoomIn",
     globalTransition: project.globalTransition ?? "hardCut",
     effectSpeed: project.effectSpeed ?? "normal",
@@ -110,10 +122,30 @@ function normalizeProject(project: CukiProject): CukiProject {
         subtitle: scene.subtitle ?? "",
         duration: Number.isFinite(scene.duration) ? scene.duration : 3,
         timingSource: scene.timingSource ?? "estimated",
+        note: scene.note ?? "",
+        srtCueStartIndex: scene.srtCueStartIndex ?? null,
+        srtCueEndIndex: scene.srtCueEndIndex ?? null,
+        manualDurationOverride: scene.manualDurationOverride ?? false,
         effect: scene.effect ?? "slowZoomIn",
         transition: scene.transition ?? project.globalTransition ?? "hardCut",
+        transitionDuration: scene.transitionDuration ?? project.transitionDuration ?? 0.25,
         subtitleStyle: scene.subtitleStyle ?? project.globalSubtitleStyle ?? "cukiBoldMeme",
       })),
     ),
   };
+}
+
+function stripLargeSessionFiles(project: CukiProject): CukiProject {
+  return {
+    ...project,
+    audioUrl: isLargeSessionUrl(project.audioUrl) ? null : project.audioUrl,
+    scenes: project.scenes.map((scene) => ({
+      ...scene,
+      imageUrl: isLargeSessionUrl(scene.imageUrl) ? null : scene.imageUrl,
+    })),
+  };
+}
+
+function isLargeSessionUrl(value: string | null | undefined) {
+  return Boolean(value && (/^(data|blob):/.test(value)));
 }

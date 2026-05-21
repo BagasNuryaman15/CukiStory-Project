@@ -1,6 +1,6 @@
-import {interpolate, useCurrentFrame} from "remotion";
+import {interpolate, useCurrentFrame, useVideoConfig} from "remotion";
 import {getSubtitleWords, getTimedIndex, splitSubtitleIntoChunks} from "../lib/subtitles";
-import type {SubtitleMode, SubtitlePosition, SubtitleSize, SubtitleStyle} from "../lib/types";
+import type {SrtCue, SubtitleMode, SubtitlePosition, SubtitleSize, SubtitleStyle} from "../lib/types";
 
 type VisibleSubtitle = {
   text: string;
@@ -24,8 +24,69 @@ export function Subtitle({
   durationInFrames: number;
 }) {
   const frame = useCurrentFrame();
-  const pop = interpolate(Math.min(frame, 12), [0, 8, 12], [0.92, 1.06, 1]);
   const visible = getVisibleSubtitle(text, mode, frame, durationInFrames);
+  return (
+    <SubtitleVisual
+      visible={visible}
+      stylePreset={stylePreset}
+      mode={mode}
+      size={size}
+      position={position}
+      frame={frame}
+    />
+  );
+}
+
+export function SrtSubtitleTrack({
+  cues,
+  stylePreset,
+  mode,
+  size,
+  position,
+}: {
+  cues: SrtCue[];
+  stylePreset: SubtitleStyle;
+  mode: SubtitleMode;
+  size: SubtitleSize;
+  position: SubtitlePosition;
+}) {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const currentTime = frame / fps;
+  const activeCue = cues.find((cue) => currentTime >= cue.start && currentTime < cue.end);
+  if (!activeCue) return null;
+
+  const cueFrame = Math.max(0, Math.round((currentTime - activeCue.start) * fps));
+  const cueDurationInFrames = Math.max(1, Math.round((activeCue.end - activeCue.start) * fps));
+  const visible = getVisibleSrtSubtitle(activeCue, mode, cueFrame, cueDurationInFrames);
+  return (
+    <SubtitleVisual
+      visible={visible}
+      stylePreset={stylePreset}
+      mode={mode}
+      size={size}
+      position={position}
+      frame={cueFrame}
+    />
+  );
+}
+
+function SubtitleVisual({
+  visible,
+  stylePreset,
+  mode,
+  size,
+  position,
+  frame,
+}: {
+  visible: VisibleSubtitle;
+  stylePreset: SubtitleStyle;
+  mode: SubtitleMode;
+  size: SubtitleSize;
+  position: SubtitlePosition;
+  frame: number;
+}) {
+  const pop = interpolate(Math.min(frame, 12), [0, 8, 12], [0.92, 1.06, 1]);
   const visibleText = visible.text;
   const fontScale = getSubtitleScale(visibleText, mode, size);
   if (!visibleText) return null;
@@ -74,6 +135,24 @@ export function Subtitle({
       </div>
     </div>
   );
+}
+
+function getVisibleSrtSubtitle(cue: SrtCue, mode: SubtitleMode, frame: number, durationInFrames: number): VisibleSubtitle {
+  if (mode === "wordByWord") {
+    const words = getSubtitleWords(cue.text);
+    return {text: words[getTimedIndex(words.length, frame, durationInFrames)] ?? ""};
+  }
+
+  if (mode === "karaoke") {
+    const words = getSubtitleWords(cue.text);
+    return {
+      text: cue.text,
+      words,
+      activeWordIndex: getTimedIndex(words.length, frame, durationInFrames),
+    };
+  }
+
+  return {text: cue.text};
 }
 
 function getVisibleSubtitle(text: string, mode: SubtitleMode, frame: number, durationInFrames: number): VisibleSubtitle {

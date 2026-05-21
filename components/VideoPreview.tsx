@@ -2,11 +2,10 @@
 
 import {Player} from "@remotion/player";
 import type {CukiProject} from "@/lib/types";
-import {getTotalSceneDuration} from "@/lib/timing";
-import {CukiStoryComposition} from "@/remotion/CukiStoryComposition";
+import {CukiStoryComposition, getProjectDurationInFrames} from "@/remotion/CukiStoryComposition";
 
 export function VideoPreview({project}: {project: CukiProject}) {
-  const durationInFrames = Math.max(1, Math.ceil(getTotalSceneDuration(project.scenes) * project.fps));
+  const durationInFrames = getProjectDurationInFrames(project);
   const hasImages = project.scenes.some((scene) => scene.imageUrl);
   const hasAudio = Boolean(project.audioUrl);
 

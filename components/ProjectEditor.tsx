@@ -2,16 +2,16 @@
 
 import Link from "next/link";
 import {useEffect, useState} from "react";
-import {AudioUploader} from "./AudioUploader";
-import {DurationSummary} from "./DurationSummary";
 import {RenderPanel} from "./RenderPanel";
 import {SceneEditor} from "./SceneEditor";
 import {StyleControls} from "./StyleControls";
 import {VideoPreview} from "./VideoPreview";
+import {VoiceSrtPanel} from "./VoiceSrtPanel";
 import type {CukiProject} from "@/lib/types";
 import {autoDistributeDurations, normalizeDurations} from "@/lib/timing";
 import {getProject, saveProject} from "@/lib/storage";
 import {templates} from "@/lib/presets";
+import {getAssignedSrtCueIndexes, getSceneSrtTiming} from "@/lib/srt";
 import {reorderScenes} from "@/lib/utils";
 
 export function ProjectEditor({projectId}: {projectId: string}) {
@@ -97,6 +97,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
         subtitleStyle: template.subtitleStyle,
         effect: template.effects[index % template.effects.length],
         transition: template.transitions[index % template.transitions.length],
+        transitionDuration: project.transitionDuration,
       })),
     });
   }
@@ -127,6 +128,9 @@ export function ProjectEditor({projectId}: {projectId: string}) {
       </header>
 
       {storageError ? <div className="mb-5 rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{storageError}</div> : null}
+      <div className="guidance-card mb-5 rounded-2xl p-4 text-sm">
+        Files are session-only in this MVP. Project metadata, SRT cues, mappings, style, timing, effects, and transitions are saved locally; re-select image/audio files after refresh if needed.
+      </div>
 
       <StepNav activeStep={activeStep} project={project} onChange={setActiveStep} />
 
@@ -142,6 +146,8 @@ export function ProjectEditor({projectId}: {projectId: string}) {
               <SceneEditor
                 scenes={project.scenes}
                 sceneDefaults={{subtitleStyle: project.globalSubtitleStyle, transition: project.globalTransition, effect: project.globalImageEffect}}
+                audioMode={project.audioMode}
+                srtCues={project.srtCues ?? []}
                 onChange={(scenes) => update({...project, scenes: reorderScenes(scenes)})}
               />
             </StepShell>
@@ -150,35 +156,32 @@ export function ProjectEditor({projectId}: {projectId: string}) {
           {activeStep === "voice" ? (
             <StepShell
               eyebrow="Step 2"
-              title="Voice Over & Timing"
-              description="Upload narration, read the duration, then distribute or normalize scene timing."
+              title="Voice & SRT Timing"
+              description="Upload narration and SRT timing. SRT drives subtitle timing while CukiStory keeps visual style control."
               footer={<StepFooter previousLabel="Back: Scenes" nextLabel="Next: Style" onPrevious={() => setActiveStep("scenes")} onNext={() => setActiveStep("style")} />}
             >
               <div className="space-y-5">
-                <AudioUploader
-                  audioUrl={project.audioUrl}
-                  audioDuration={project.audioDuration}
-                  onAudioChange={(audioUrl, audioDuration) => update({...project, audioUrl, audioDuration})}
-                />
-                <DurationSummary project={project} />
-                <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
-                  <h3 className="text-lg font-extrabold text-white">Timing Tools</h3>
-                  <p className="mt-1 text-sm text-studio-muted">Auto Timing estimates speech from subtitles and syncs to VO when audio exists. Normalize preserves your manual ratios while matching VO duration.</p>
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      onClick={() => update({...project, scenes: autoDistributeDurations(project.scenes, project.audioDuration)})}
-                      className="btn-primary px-5 py-3"
-                    >
-                      Auto Timing
-                    </button>
-                    <button
-                      onClick={() => update({...project, scenes: normalizeDurations(project.scenes, project.audioDuration)})}
-                      className="btn-secondary px-5 py-3"
-                    >
-                      Normalize Duration
-                    </button>
+                <VoiceSrtPanel project={project} onChange={update} />
+                {project.audioMode !== "fullVoSrt" ? (
+                  <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
+                    <h3 className="text-lg font-extrabold text-white">Estimated Timing Tools</h3>
+                    <p className="mt-1 text-sm text-studio-muted">Fallback timing estimates speech from subtitles and syncs to VO when audio exists.</p>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button
+                        onClick={() => update({...project, scenes: autoDistributeDurations(project.scenes, project.audioDuration)})}
+                        className="btn-primary px-5 py-3"
+                      >
+                        Auto Timing
+                      </button>
+                      <button
+                        onClick={() => update({...project, scenes: normalizeDurations(project.scenes, project.audioDuration)})}
+                        className="btn-secondary px-5 py-3"
+                      >
+                        Normalize Duration
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : null}
               </div>
             </StepShell>
           ) : null}
@@ -223,7 +226,7 @@ type EditorStep = "scenes" | "voice" | "style" | "preview";
 
 const steps: Array<{id: EditorStep; label: string; description: string}> = [
   {id: "scenes", label: "Scenes", description: "Panels and captions"},
-  {id: "voice", label: "Voice Over", description: "Audio and timing"},
+  {id: "voice", label: "Voice & SRT", description: "Audio and subtitle timing"},
   {id: "style", label: "Style", description: "Captions and motion"},
   {id: "preview", label: "Preview & Render", description: "Export MP4"},
 ];
@@ -257,7 +260,7 @@ function StepNav({activeStep, project, onChange}: {activeStep: EditorStep; proje
 function StepStatus({step, project}: {step: EditorStep; project: CukiProject}) {
   const ready = {
     scenes: project.scenes.length > 0,
-    voice: Boolean(project.audioDuration),
+    voice: project.audioMode === "fullVoSrt" ? Boolean(project.audioDuration && project.srtCues?.length) : Boolean(project.audioDuration),
     style: true,
     preview: project.scenes.length > 0 && Boolean(project.audioDuration),
   }[step];
@@ -317,7 +320,7 @@ function StepFooter({
 function ActiveStepHint({activeStep, onPreview}: {activeStep: EditorStep; onPreview: () => void}) {
   const text = {
     scenes: "Build your panels first. Preview updates live as soon as scenes are added.",
-    voice: "Upload VO and sync duration. The preview stays available while timing changes.",
+    voice: "Upload VO and SRT timing. The preview stays available while timing changes.",
     style: "Style choices apply to the preview immediately.",
     preview: "Ready for final review.",
   }[activeStep];
@@ -334,6 +337,10 @@ function ActiveStepHint({activeStep, onPreview}: {activeStep: EditorStep; onPrev
 }
 
 function FinalChecklist({project}: {project: CukiProject}) {
+  const srtCues = project.srtCues ?? [];
+  const assignedCueIndexes = getAssignedSrtCueIndexes(project.scenes);
+  const assignedCueCount = srtCues.filter((cue) => assignedCueIndexes.has(cue.index)).length;
+  const mappedSceneCount = project.scenes.filter((scene) => getSceneSrtTiming(scene, srtCues)).length;
   const subtitleModeLabel = {
     full: "Full subtitle chunks enabled",
     wordByWord: "Word-by-word subtitles enabled",
@@ -342,6 +349,11 @@ function FinalChecklist({project}: {project: CukiProject}) {
   const items = [
     {label: `${project.scenes.length} scene${project.scenes.length === 1 ? "" : "s"} added`, ready: project.scenes.length > 0},
     {label: project.audioDuration ? "Voice over loaded" : "Voice over still needed", ready: Boolean(project.audioDuration)},
+    {label: project.audioMode === "fullVoSrt" ? `${project.srtCues?.length ?? 0} SRT cues parsed` : "Estimated timing fallback", ready: project.audioMode !== "fullVoSrt" || Boolean(project.srtCues?.length)},
+    ...(project.audioMode === "fullVoSrt" ? [
+      {label: `${mappedSceneCount}/${project.scenes.length} scenes mapped to SRT`, ready: project.scenes.length > 0 && mappedSceneCount === project.scenes.length},
+      {label: `${assignedCueCount}/${srtCues.length} SRT cues assigned`, ready: srtCues.length > 0 && assignedCueCount === srtCues.length},
+    ] : []),
     {label: "Global style selected", ready: true},
     {label: subtitleModeLabel, ready: true},
   ];

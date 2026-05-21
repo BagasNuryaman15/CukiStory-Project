@@ -1,8 +1,11 @@
 "use client";
 
-import type {CukiScene} from "@/lib/types";
+import type {AudioMode, CukiScene, SrtCue} from "@/lib/types";
+import {transitionDurations} from "@/lib/presets";
+import {formatShortTimestamp, getSceneSrtCues, getSceneSrtTiming} from "@/lib/srt";
 import {fileToDataUrl, formatSeconds} from "@/lib/utils";
 import {EffectPicker} from "./EffectPicker";
+import {TransitionPicker} from "./TransitionPicker";
 
 type SceneCardProps = {
   scene: CukiScene;
@@ -14,10 +17,16 @@ type SceneCardProps = {
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  audioMode?: AudioMode;
+  srtCues?: SrtCue[];
 };
 
-export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate, onDelete, onMoveUp, onMoveDown}: SceneCardProps) {
-  const warnings = getSceneWarnings(scene);
+export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate, onDelete, onMoveUp, onMoveDown, audioMode, srtCues = []}: SceneCardProps) {
+  const isSrtMode = audioMode === "fullVoSrt";
+  const srtTiming = isSrtMode ? getSceneSrtTiming(scene, srtCues) : null;
+  const mappedCues = isSrtMode ? getSceneSrtCues(scene, srtCues) : [];
+  const effectiveDuration = srtTiming?.duration ?? scene.duration;
+  const warnings = getSceneWarnings(scene, isSrtMode, mappedCues.length > 0);
 
   async function handleImage(file: File | undefined) {
     if (!file) return;
@@ -29,13 +38,27 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
     }
   }
 
+  function updateSrtMapping(nextStart: number | null, nextEnd: number | null) {
+    const nextScene = {
+      ...scene,
+      srtCueStartIndex: nextStart,
+      srtCueEndIndex: nextEnd,
+      timingSource: nextStart != null && nextEnd != null ? "synced" as const : scene.timingSource,
+    };
+    const timing = getSceneSrtTiming(nextScene, srtCues);
+    onChange({
+      ...nextScene,
+      duration: timing && !nextScene.manualDurationOverride ? timing.duration : nextScene.duration,
+    });
+  }
+
   return (
     <article className="glass-card rounded-[1.5rem] p-5">
       <div className="flex flex-col gap-4 xl:flex-row">
         <div className="w-full xl:w-56">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-lg font-extrabold text-white">Scene {index + 1}</p>
-            <p className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-bold text-studio-muted">{formatSeconds(scene.duration)}</p>
+            <p className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-bold text-studio-muted">{formatSeconds(effectiveDuration)}</p>
           </div>
           <label className="group relative flex aspect-[9/16] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/20 bg-gradient-to-br from-white/[0.07] to-white/[0.02]">
             {scene.imageUrl ? (
@@ -53,33 +76,124 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
         </div>
 
         <div className="flex-1 space-y-4">
+          {isSrtMode ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <TimelineStat label="Start" value={srtTiming ? formatShortTimestamp(srtTiming.start) : "Unmapped"} />
+              <TimelineStat label="End" value={srtTiming ? formatShortTimestamp(srtTiming.end) : "Unmapped"} />
+              <TimelineStat label="Duration" value={formatSeconds(effectiveDuration)} />
+            </div>
+          ) : null}
+
+          {isSrtMode ? (
+            <MappedSrtPreview mappedCues={mappedCues} />
+          ) : (
+            <div>
+              <label className="text-xs font-bold uppercase tracking-[0.22em] text-studio-muted">Subtitle</label>
+              <textarea
+                value={scene.subtitle}
+                onChange={(event) => onChange({...scene, subtitle: event.target.value})}
+                rows={4}
+                className="studio-input mt-2 w-full resize-y rounded-2xl px-4 py-3"
+                placeholder="Write the burned-in subtitle for this scene..."
+              />
+            </div>
+          )}
+
           <div>
-            <label className="text-xs font-bold uppercase tracking-[0.22em] text-studio-muted">Subtitle</label>
-            <textarea
-              value={scene.subtitle}
-              onChange={(event) => onChange({...scene, subtitle: event.target.value})}
-              rows={4}
-              className="studio-input mt-2 w-full resize-y rounded-2xl px-4 py-3"
-              placeholder="Write the burned-in subtitle for this scene..."
+            <label className="text-xs font-bold uppercase tracking-[0.22em] text-studio-muted">Scene Note</label>
+            <input
+              value={scene.note ?? ""}
+              onChange={(event) => onChange({...scene, note: event.target.value})}
+              className="studio-input mt-2 w-full rounded-2xl px-4 py-3"
+              placeholder="Optional creator note for this panel..."
             />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Duration (seconds)">
+              {isSrtMode ? (
+                <label className="mb-3 flex items-center gap-2 text-sm font-bold text-studio-muted">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(scene.manualDurationOverride)}
+                    onChange={(event) => onChange({...scene, manualDurationOverride: event.target.checked})}
+                  />
+                  Manual duration override
+                </label>
+              ) : null}
               <input
                 type="number"
                 min={0.1}
                 step={0.1}
-                value={scene.duration}
+                disabled={isSrtMode && !scene.manualDurationOverride}
+                value={Number(effectiveDuration.toFixed(2))}
                 onChange={(event) => onChange({...scene, duration: Number(event.target.value), timingSource: "manual"})}
                 className="studio-input w-full rounded-xl px-3 py-2 text-sm"
               />
-              <p className="mt-2 text-xs font-bold text-studio-muted">{getTimingSourceLabel(scene)}</p>
+              <p className="mt-2 text-xs font-bold text-studio-muted">{getTimingSourceLabel(scene, isSrtMode, Boolean(srtTiming))}</p>
             </Field>
             <Field label="Image Effect">
               <EffectPicker value={scene.effect} onChange={(effect) => onChange({...scene, effect})} />
             </Field>
+            <Field label="Transition to next scene">
+              <TransitionPicker value={scene.transition} onChange={(transition) => onChange({...scene, transition})} />
+            </Field>
+            <Field label="Transition duration">
+              <select
+                value={scene.transitionDuration ?? 0.25}
+                onChange={(event) => onChange({...scene, transitionDuration: Number(event.target.value)})}
+                className="studio-input w-full rounded-xl px-3 py-2 text-sm"
+              >
+                {transitionDurations.map((duration) => (
+                  <option key={duration.value} value={duration.value}>{duration.label}</option>
+                ))}
+              </select>
+            </Field>
           </div>
+
+          {isSrtMode ? (
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-extrabold text-white">SRT Mapping</p>
+                  <p className="mt-1 text-sm text-studio-muted">Choose the subtitle cue range for this image scene.</p>
+                </div>
+                <button onClick={() => updateSrtMapping(null, null)} className="btn-quiet px-3 py-2 text-sm">
+                  Clear Mapping
+                </button>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Start subtitle cue">
+                  <select
+                    value={scene.srtCueStartIndex ?? ""}
+                    onChange={(event) => updateSrtMapping(event.target.value ? Number(event.target.value) : null, scene.srtCueEndIndex ?? null)}
+                    className="studio-input w-full rounded-xl px-3 py-2 text-sm"
+                  >
+                    <option value="">Select start cue</option>
+                    {srtCues.map((cue) => <option key={cue.id} value={cue.index}>{cueLabel(cue)}</option>)}
+                  </select>
+                </Field>
+                <Field label="End subtitle cue">
+                  <select
+                    value={scene.srtCueEndIndex ?? ""}
+                    onChange={(event) => updateSrtMapping(scene.srtCueStartIndex ?? null, event.target.value ? Number(event.target.value) : null)}
+                    className="studio-input w-full rounded-xl px-3 py-2 text-sm"
+                  >
+                    <option value="">Select end cue</option>
+                    {srtCues.map((cue) => <option key={cue.id} value={cue.index}>{cueLabel(cue)}</option>)}
+                  </select>
+                </Field>
+              </div>
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-studio-muted">Calculated from SRT</p>
+                <p className="mt-2 text-sm font-bold text-white">
+                  {srtTiming
+                    ? `${formatShortTimestamp(srtTiming.start)} - ${formatShortTimestamp(srtTiming.end)} · ${formatSeconds(srtTiming.duration)}`
+                    : "No SRT timing mapped yet."}
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           {warnings.length > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -103,6 +217,39 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
   );
 }
 
+function MappedSrtPreview({mappedCues}: {mappedCues: SrtCue[]}) {
+  return (
+    <div className={`rounded-2xl border p-4 ${mappedCues.length > 0 ? "border-studio-cyan/20 bg-studio-cyan/10" : "border-white/10 bg-white/[0.035]"}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-studio-muted">Mapped SRT Preview</p>
+          <p className="mt-1 text-sm text-studio-muted">These cues are the subtitles that render for this scene.</p>
+        </div>
+        <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-extrabold text-cyan-100">
+          {mappedCues.length} cue{mappedCues.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      {mappedCues.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          {mappedCues.map((cue) => (
+            <div key={cue.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+              <p className="text-xs font-bold text-cyan-100">
+                Cue {cue.index} · {formatShortTimestamp(cue.start)} - {formatShortTimestamp(cue.end)}
+              </p>
+              <p className="mt-1 text-sm font-bold leading-6 text-white">{cue.text}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-xl border border-dashed border-white/15 bg-black/20 p-3 text-sm text-studio-muted">
+          Map SRT cues below to control this scene timing and subtitles.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Field({label, children}: {label: string; children: React.ReactNode}) {
   return (
     <label>
@@ -120,16 +267,33 @@ function SmallButton({children, onClick, disabled}: {children: React.ReactNode; 
   );
 }
 
-function getSceneWarnings(scene: CukiScene) {
+function TimelineStat({label, value}: {label: string; value: string}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+      <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-studio-muted">{label}</p>
+      <p className="mt-1 text-sm font-extrabold text-white">{value}</p>
+    </div>
+  );
+}
+
+function getSceneWarnings(scene: CukiScene, isSrtMode: boolean, hasMappedCues: boolean) {
   const warnings: string[] = [];
   if (!scene.imageUrl) warnings.push("Add image");
-  if (!scene.subtitle.trim()) warnings.push("Add subtitle");
-  if (scene.duration < 2) warnings.push("Duration is short");
+  if (isSrtMode && !hasMappedCues) warnings.push("Map SRT cues");
+  if (!isSrtMode && !scene.subtitle.trim()) warnings.push("Add subtitle");
+  if (scene.duration < 2 && (!isSrtMode || scene.manualDurationOverride)) warnings.push("Duration is short");
   return warnings;
 }
 
-function getTimingSourceLabel(scene: CukiScene) {
+function getTimingSourceLabel(scene: CukiScene, isSrtMode: boolean, hasSrtTiming: boolean) {
+  if (isSrtMode && hasSrtTiming && !scene.manualDurationOverride) return "Controlled by mapped SRT cues";
+  if (isSrtMode && !hasSrtTiming) return "Map SRT cues to calculate timing";
   if (scene.timingSource === "manual") return "Manual override";
   if (scene.timingSource === "synced") return "Synced to VO duration";
   return "Estimated from subtitle";
+}
+
+function cueLabel(cue: SrtCue) {
+  const text = cue.text.replace(/\s+/g, " ");
+  return `${cue.index} - ${formatShortTimestamp(cue.start)} - ${text.length > 52 ? `${text.slice(0, 52)}...` : text}`;
 }
