@@ -7,7 +7,7 @@ import {formatSeconds} from "@/lib/utils";
 export function DurationSummary({project}: {project: CukiProject}) {
   const total = getTotalSceneDuration(project.scenes);
   const diff = getDurationDifference(project);
-  const mismatch = project.audioDuration !== null && Math.abs(diff) > 0.25;
+  const mismatch = project.audioDuration !== null && Math.abs(diff) > 0.5;
 
   return (
     <div className="grid gap-3 sm:grid-cols-3">

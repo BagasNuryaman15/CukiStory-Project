@@ -7,7 +7,6 @@ import {DurationSummary} from "./DurationSummary";
 import {RenderPanel} from "./RenderPanel";
 import {SceneEditor} from "./SceneEditor";
 import {StyleControls} from "./StyleControls";
-import {TemplatePicker} from "./TemplatePicker";
 import {VideoPreview} from "./VideoPreview";
 import type {CukiProject} from "@/lib/types";
 import {autoDistributeDurations, normalizeDurations} from "@/lib/timing";
@@ -91,6 +90,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
     update({
       ...project,
       globalSubtitleStyle: template.subtitleStyle,
+      globalImageEffect: template.effects[0] ?? project.globalImageEffect,
       globalTransition: template.transitions[0] ?? project.globalTransition,
       scenes: project.scenes.map((scene, index) => ({
         ...scene,
@@ -141,7 +141,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
             >
               <SceneEditor
                 scenes={project.scenes}
-                sceneDefaults={{subtitleStyle: project.globalSubtitleStyle, transition: project.globalTransition}}
+                sceneDefaults={{subtitleStyle: project.globalSubtitleStyle, transition: project.globalTransition, effect: project.globalImageEffect}}
                 onChange={(scenes) => update({...project, scenes: reorderScenes(scenes)})}
               />
             </StepShell>
@@ -190,10 +190,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
               description="Choose the global caption look, transition behavior, motion speed, and subtitle reveal mode."
               footer={<StepFooter previousLabel="Back: Voice Over" nextLabel="Next: Preview" onPrevious={() => setActiveStep("voice")} onNext={() => setActiveStep("preview")} />}
             >
-              <div className="space-y-5">
-                <TemplatePicker onApply={applyTemplate} />
-                <StyleControls project={project} onChange={update} />
-              </div>
+              <StyleControls project={project} onChange={update} onApplyTemplate={applyTemplate} />
             </StepShell>
           ) : null}
 

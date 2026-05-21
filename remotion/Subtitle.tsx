@@ -1,6 +1,6 @@
 import {interpolate, useCurrentFrame} from "remotion";
 import {getSubtitleWords, getTimedIndex, splitSubtitleIntoChunks} from "../lib/subtitles";
-import type {SubtitleMode, SubtitleStyle} from "../lib/types";
+import type {SubtitleMode, SubtitlePosition, SubtitleSize, SubtitleStyle} from "../lib/types";
 
 type VisibleSubtitle = {
   text: string;
@@ -8,12 +8,26 @@ type VisibleSubtitle = {
   activeWordIndex?: number;
 };
 
-export function Subtitle({text, stylePreset, mode, durationInFrames}: {text: string; stylePreset: SubtitleStyle; mode: SubtitleMode; durationInFrames: number}) {
+export function Subtitle({
+  text,
+  stylePreset,
+  mode,
+  size,
+  position,
+  durationInFrames,
+}: {
+  text: string;
+  stylePreset: SubtitleStyle;
+  mode: SubtitleMode;
+  size: SubtitleSize;
+  position: SubtitlePosition;
+  durationInFrames: number;
+}) {
   const frame = useCurrentFrame();
   const pop = interpolate(Math.min(frame, 12), [0, 8, 12], [0.92, 1.06, 1]);
   const visible = getVisibleSubtitle(text, mode, frame, durationInFrames);
   const visibleText = visible.text;
-  const fontScale = getSubtitleScale(visibleText, mode);
+  const fontScale = getSubtitleScale(visibleText, mode, size);
   if (!visibleText) return null;
   const karaokeWords = mode === "karaoke" ? visible.words : undefined;
 
@@ -21,10 +35,10 @@ export function Subtitle({text, stylePreset, mode, durationInFrames}: {text: str
     position: "absolute",
     left: "8%",
     right: "8%",
-    bottom: mode === "wordByWord" ? 210 : 190,
     zIndex: 5,
     textAlign: "center",
     pointerEvents: "none",
+    ...getPositionStyle(position, mode),
   };
   const base: React.CSSProperties = {
     boxSizing: "border-box",
@@ -32,10 +46,10 @@ export function Subtitle({text, stylePreset, mode, durationInFrames}: {text: str
     WebkitBoxOrient: mode === "wordByWord" ? undefined : "vertical",
     WebkitLineClamp: mode === "wordByWord" ? undefined : 2,
     maxWidth: "100%",
-    maxHeight: mode === "wordByWord" ? 150 : 190,
+    maxHeight: mode === "wordByWord" ? 170 : 184,
     fontFamily: "Arial, Helvetica, sans-serif",
     fontWeight: 900,
-    lineHeight: 1.14,
+    lineHeight: mode === "wordByWord" ? 1.08 : 1.16,
     letterSpacing: 0,
     overflow: "hidden",
     overflowWrap: "anywhere",
@@ -88,19 +102,37 @@ function getVisibleSubtitle(text: string, mode: SubtitleMode, frame: number, dur
   return {text: activeChunk.text};
 }
 
-function getSubtitleScale(text: string, mode: SubtitleMode) {
+function getSubtitleScale(text: string, mode: SubtitleMode, size: SubtitleSize) {
+  const sizeScale = {
+    small: 0.88,
+    normal: 1,
+    large: 1.12,
+  }[size];
+
   if (mode === "wordByWord") {
-    if (text.length > 18) return 0.72;
-    if (text.length > 13) return 0.84;
-    if (text.length > 9) return 0.94;
-    return 1;
+    if (text.length > 18) return 0.72 * sizeScale;
+    if (text.length > 13) return 0.84 * sizeScale;
+    if (text.length > 9) return 0.94 * sizeScale;
+    return sizeScale;
   }
 
   const length = text.trim().length;
-  if (length > 64) return 0.78;
-  if (length > 48) return 0.86;
-  if (length > 32) return 0.94;
-  return 1;
+  if (length > 64) return 0.76 * sizeScale;
+  if (length > 48) return 0.84 * sizeScale;
+  if (length > 32) return 0.93 * sizeScale;
+  return sizeScale;
+}
+
+function getPositionStyle(position: SubtitlePosition, mode: SubtitleMode): React.CSSProperties {
+  if (position === "top") {
+    return {top: mode === "wordByWord" ? 220 : 240};
+  }
+
+  if (position === "center") {
+    return {top: "50%", transform: "translateY(-50%)"};
+  }
+
+  return {bottom: mode === "wordByWord" ? 210 : 190};
 }
 
 function scaled(size: number, scale: number) {

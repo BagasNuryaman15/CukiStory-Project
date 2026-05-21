@@ -4,24 +4,26 @@ export type SubtitleChunk = {
 };
 
 const MIN_CHUNK_WORDS = 3;
-const PREFERRED_CHUNK_WORDS = 4;
-const MAX_CHUNK_WORDS = 4;
-const PUNCTUATION_END = /(?:[,.!?]|\.\.\.|…)$/u;
+const PREFERRED_CHUNK_WORDS = 5;
+const MAX_CHUNK_WORDS = 7;
+const PUNCTUATION_END = /(?:\.{3}|…|[,.!?])$/u;
 
 export function splitSubtitleIntoChunks(text: string): SubtitleChunk[] {
   const words = getSubtitleWords(text);
   if (words.length === 0) return [];
-  if (words.length <= 7) return [createChunk(words)];
+  if (words.length <= MAX_CHUNK_WORDS) return [createChunk(words)];
 
   const chunks: string[][] = [];
   let current: string[] = [];
 
-  words.forEach((word) => {
+  words.forEach((word, index) => {
     current.push(word);
+    const remainingWords = words.length - index - 1;
     const canSplitAtPunctuation = current.length >= MIN_CHUNK_WORDS && PUNCTUATION_END.test(word);
+    const shouldSplitByPreferredLength = current.length >= PREFERRED_CHUNK_WORDS && remainingWords >= MIN_CHUNK_WORDS;
     const shouldSplitByLength = current.length >= MAX_CHUNK_WORDS;
 
-    if (canSplitAtPunctuation || shouldSplitByLength) {
+    if (canSplitAtPunctuation || shouldSplitByPreferredLength || shouldSplitByLength) {
       chunks.push(current);
       current = [];
     }
@@ -65,7 +67,7 @@ function rebalanceChunks(chunks: string[][]) {
 
   const last = balanced[balanced.length - 1];
   const previous = balanced[balanced.length - 2];
-  if (last && previous && last.length === 1 && previous.length > MIN_CHUNK_WORDS) {
+  while (last && previous && last.length < MIN_CHUNK_WORDS && previous.length > MIN_CHUNK_WORDS) {
     last.unshift(previous.pop() as string);
   }
 

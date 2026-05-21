@@ -64,13 +64,13 @@ export function RenderPanel({project, onSave}: {project: CukiProject; onSave: ()
 
 function validateForRender(project: CukiProject) {
   const warnings: string[] = [];
-  if (!project.audioUrl) warnings.push("Add VO audio so the export includes narration.");
-  if (!project.audioDuration) warnings.push("Load audio duration before final timing.");
+  if (!project.audioUrl) warnings.push("No VO audio uploaded yet.");
+  if (project.audioUrl && !project.audioDuration) warnings.push("Load audio duration before final timing.");
   if (project.scenes.length === 0) warnings.push("Add at least one scene.");
   project.scenes.forEach((scene, index) => {
     if (!scene.imageUrl) warnings.push(`Scene ${index + 1}: add a panel image.`);
     if (!scene.subtitle.trim()) warnings.push(`Scene ${index + 1}: add subtitle text.`);
-    if (scene.duration < 1) warnings.push(`Scene ${index + 1}: set duration to at least 1 second.`);
+    if (scene.duration < 2) warnings.push(`Scene ${index + 1}: duration is shorter than 2 seconds.`);
   });
   if (project.audioDuration && Math.abs(getDurationDifference(project)) > 0.5) {
     const difference = getDurationDifference(project);

@@ -1,4 +1,4 @@
-import type {ImageEffect, MotionSpeed, SubtitleMode, SubtitleStyle, TemplatePreset, TransitionType} from "./types";
+import type {ImageEffect, MotionSpeed, SubtitleMode, SubtitlePosition, SubtitleSize, SubtitleStyle, TemplatePreset, TransitionType} from "./types";
 
 export const subtitleStyles: Array<{value: SubtitleStyle; label: string; description: string}> = [
   {value: "cukiBoldMeme", label: "Cuki Bold Meme", description: "Big white text, thick outline, comedy punch."},
@@ -47,14 +47,27 @@ export const motionSpeeds: Array<{value: MotionSpeed; label: string; description
 export const transitionDurations: Array<{value: number; label: string}> = [
   {value: 0.15, label: "0.15s"},
   {value: 0.25, label: "0.25s"},
-  {value: 0.4, label: "0.4s"},
-  {value: 0.65, label: "0.65s"},
+  {value: 0.5, label: "0.5s"},
+  {value: 0.75, label: "0.75s"},
+  {value: 1, label: "1.0s"},
 ];
 
 export const subtitleModes: Array<{value: SubtitleMode; label: string; description: string}> = [
   {value: "full", label: "Full subtitle", description: "Show timed subtitle chunks with a compact lower-third layout."},
   {value: "wordByWord", label: "Word-by-word reveal", description: "Show only one active word at a time."},
   {value: "karaoke", label: "Karaoke highlight", description: "Show the current chunk and highlight the active word."},
+];
+
+export const subtitleSizes: Array<{value: SubtitleSize; label: string}> = [
+  {value: "small", label: "Small"},
+  {value: "normal", label: "Normal"},
+  {value: "large", label: "Large"},
+];
+
+export const subtitlePositions: Array<{value: SubtitlePosition; label: string}> = [
+  {value: "lowerThird", label: "Lower third"},
+  {value: "center", label: "Center"},
+  {value: "top", label: "Top"},
 ];
 
 export const templates: TemplatePreset[] = [

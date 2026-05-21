@@ -22,6 +22,8 @@ export function CukiStoryComposition({project}: {project: CukiProject}) {
               effectSpeed={project.effectSpeed ?? "normal"}
               transitionDuration={project.transitionDuration ?? 0.25}
               subtitleMode={project.subtitleMode ?? "full"}
+              subtitleSize={project.subtitleSize ?? "normal"}
+              subtitlePosition={project.subtitlePosition ?? "lowerThird"}
             />
           </Sequence>
         );

@@ -124,7 +124,7 @@ function getSceneWarnings(scene: CukiScene) {
   const warnings: string[] = [];
   if (!scene.imageUrl) warnings.push("Add image");
   if (!scene.subtitle.trim()) warnings.push("Add subtitle");
-  if (scene.duration < 1) warnings.push("Increase duration");
+  if (scene.duration < 2) warnings.push("Duration is short");
   return warnings;
 }
 

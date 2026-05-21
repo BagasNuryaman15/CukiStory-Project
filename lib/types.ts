@@ -37,6 +37,10 @@ export type MotionSpeed = "slow" | "normal" | "fast";
 
 export type SubtitleMode = "full" | "wordByWord" | "karaoke";
 
+export type SubtitleSize = "small" | "normal" | "large";
+
+export type SubtitlePosition = "lowerThird" | "center" | "top";
+
 export type TimingSource = "estimated" | "synced" | "manual";
 
 export type CukiScene = {
@@ -61,10 +65,13 @@ export type CukiProject = {
   audioUrl: string | null;
   audioDuration: number | null;
   globalSubtitleStyle: SubtitleStyle;
+  globalImageEffect: ImageEffect;
   globalTransition: TransitionType;
   effectSpeed: MotionSpeed;
   transitionDuration: number;
   subtitleMode: SubtitleMode;
+  subtitleSize: SubtitleSize;
+  subtitlePosition: SubtitlePosition;
   scenes: CukiScene[];
   createdAt: string;
   updatedAt: string;

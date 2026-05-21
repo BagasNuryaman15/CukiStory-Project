@@ -1,5 +1,5 @@
 import {AbsoluteFill, Img, useCurrentFrame, useVideoConfig} from "remotion";
-import type {CukiScene, MotionSpeed, SubtitleMode} from "../lib/types";
+import type {CukiScene, MotionSpeed, SubtitleMode, SubtitlePosition, SubtitleSize} from "../lib/types";
 import {getImageEffectStyle} from "./effects";
 import {Subtitle} from "./Subtitle";
 import {getTransitionOverlay, getTransitionStyle} from "./transitions";
@@ -11,6 +11,8 @@ export function Scene({
   effectSpeed,
   transitionDuration,
   subtitleMode,
+  subtitleSize,
+  subtitlePosition,
 }: {
   scene: CukiScene;
   durationInFrames: number;
@@ -18,6 +20,8 @@ export function Scene({
   effectSpeed: MotionSpeed;
   transitionDuration: number;
   subtitleMode: SubtitleMode;
+  subtitleSize: SubtitleSize;
+  subtitlePosition: SubtitlePosition;
 }) {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
@@ -43,7 +47,16 @@ export function Scene({
           <div style={{color: "rgba(255,255,255,0.6)", fontSize: 52, fontWeight: 800}}>Missing Image</div>
         </AbsoluteFill>
       )}
-      {scene.subtitle.trim() ? <Subtitle text={scene.subtitle} stylePreset={scene.subtitleStyle} mode={subtitleMode} durationInFrames={durationInFrames} /> : null}
+      {scene.subtitle.trim() ? (
+        <Subtitle
+          text={scene.subtitle}
+          stylePreset={scene.subtitleStyle}
+          mode={subtitleMode}
+          size={subtitleSize}
+          position={subtitlePosition}
+          durationInFrames={durationInFrames}
+        />
+      ) : null}
       {overlay ? <AbsoluteFill style={{zIndex: 10, pointerEvents: "none", ...overlay}} /> : null}
     </AbsoluteFill>
   );

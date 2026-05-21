@@ -1,6 +1,6 @@
 "use client";
 
-import type {CukiProject, CukiScene, SubtitleStyle, TransitionType} from "./types";
+import type {CukiProject, CukiScene, ImageEffect, SubtitleStyle, TransitionType} from "./types";
 import {createId, reorderScenes} from "./utils";
 
 const STORAGE_KEY = "cukistory.projects.v1";
@@ -53,10 +53,13 @@ export function createProject(title: string) {
     audioUrl: null,
     audioDuration: null,
     globalSubtitleStyle: "cukiBoldMeme",
+    globalImageEffect: "slowZoomIn",
     globalTransition: "hardCut",
     effectSpeed: "normal",
     transitionDuration: 0.25,
     subtitleMode: "full",
+    subtitleSize: "normal",
+    subtitlePosition: "lowerThird",
     scenes: [],
     createdAt: now,
     updatedAt: now,
@@ -69,6 +72,7 @@ export function createScene(
   defaults?: {
     subtitleStyle?: SubtitleStyle;
     transition?: TransitionType;
+    effect?: ImageEffect;
   },
 ): CukiScene {
   return {
@@ -78,7 +82,7 @@ export function createScene(
     subtitle: "",
     duration: 3,
     timingSource: "estimated",
-    effect: "slowZoomIn",
+    effect: defaults?.effect ?? "slowZoomIn",
     transition: defaults?.transition ?? "hardCut",
     subtitleStyle: defaults?.subtitleStyle ?? "cukiBoldMeme",
   };
@@ -92,10 +96,13 @@ function normalizeProject(project: CukiProject): CukiProject {
     width: 1080,
     height: 1920,
     globalSubtitleStyle: project.globalSubtitleStyle ?? "cukiBoldMeme",
+    globalImageEffect: project.globalImageEffect ?? "slowZoomIn",
     globalTransition: project.globalTransition ?? "hardCut",
     effectSpeed: project.effectSpeed ?? "normal",
     transitionDuration: project.transitionDuration ?? 0.25,
     subtitleMode: project.subtitleMode ?? "full",
+    subtitleSize: project.subtitleSize ?? "normal",
+    subtitlePosition: project.subtitlePosition ?? "lowerThird",
     scenes: reorderScenes(
       (project.scenes ?? []).map((scene) => ({
         ...scene,

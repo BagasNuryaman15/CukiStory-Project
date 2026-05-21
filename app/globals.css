@@ -22,9 +22,9 @@ body {
   margin: 0;
   color: #f7f7fb;
   background:
-    radial-gradient(circle at 12% 8%, rgba(56, 216, 255, 0.2), transparent 32rem),
-    radial-gradient(circle at 85% 5%, rgba(255, 79, 216, 0.18), transparent 32rem),
-    radial-gradient(circle at 50% 95%, rgba(95, 124, 255, 0.22), transparent 34rem),
+    radial-gradient(circle at 12% 8%, rgba(56, 216, 255, 0.14), transparent 30rem),
+    radial-gradient(circle at 85% 5%, rgba(255, 79, 216, 0.12), transparent 30rem),
+    radial-gradient(circle at 50% 95%, rgba(95, 124, 255, 0.16), transparent 32rem),
     linear-gradient(135deg, #070817 0%, #0d1021 48%, #08091a 100%);
   font-family: var(--font-sans), ui-sans-serif, system-ui;
   text-rendering: optimizeLegibility;
@@ -45,7 +45,7 @@ button:disabled {
 .glass-card {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(145deg, rgba(21, 26, 50, 0.9), rgba(10, 12, 26, 0.86));
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 14px 46px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(22px);
 }
 
@@ -75,39 +75,45 @@ button:disabled {
 }
 
 .btn-primary {
-  background: linear-gradient(90deg, #38d8ff, #5f7cff 52%, #ff4fd8);
-  color: white;
-  box-shadow: 0 12px 42px rgba(95, 124, 255, 0.26);
+  border: 1px solid rgba(104, 211, 255, 0.28);
+  background: linear-gradient(135deg, #1ca9cf 0%, #4568de 100%);
+  color: #f8fbff;
+  box-shadow: 0 10px 30px rgba(37, 132, 215, 0.2);
 }
 
 .btn-primary:hover {
+  border-color: rgba(151, 226, 255, 0.38);
+  background: linear-gradient(135deg, #22b7dd 0%, #5275ec 100%);
   transform: translateY(-1px);
 }
 
 .btn-secondary {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
+  border: 1px solid rgba(164, 179, 214, 0.16);
+  background: rgba(255, 255, 255, 0.065);
+  color: #eef4ff;
 }
 
 .btn-secondary:hover,
 .btn-quiet:hover {
-  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(164, 179, 214, 0.24);
+  background: rgba(255, 255, 255, 0.105);
 }
 
 .btn-quiet {
-  background: rgba(255, 255, 255, 0.05);
-  color: #d9def0;
+  border: 1px solid rgba(164, 179, 214, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cfd7ea;
 }
 
 .btn-danger {
-  border: 1px solid rgba(248, 113, 113, 0.36);
-  background: rgba(239, 68, 68, 0.08);
-  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.26);
+  background: rgba(239, 68, 68, 0.075);
+  color: #ffd1d1;
 }
 
 .btn-danger:hover {
-  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(248, 113, 113, 0.34);
+  background: rgba(239, 68, 68, 0.13);
 }
 
 .guidance-card {

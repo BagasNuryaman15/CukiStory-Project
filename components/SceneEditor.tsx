@@ -1,6 +1,6 @@
 "use client";
 
-import type {CukiScene, SubtitleStyle, TransitionType} from "@/lib/types";
+import type {CukiScene, ImageEffect, SubtitleStyle, TransitionType} from "@/lib/types";
 import {createScene} from "@/lib/storage";
 import {createId, reorderScenes} from "@/lib/utils";
 import {SceneCard} from "./SceneCard";
@@ -15,6 +15,7 @@ export function SceneEditor({
   sceneDefaults?: {
     subtitleStyle: SubtitleStyle;
     transition: TransitionType;
+    effect: ImageEffect;
   };
 }) {
   function addScene() {

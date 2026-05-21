@@ -12,10 +12,13 @@ const defaultProject: CukiProject = {
   audioUrl: null,
   audioDuration: null,
   globalSubtitleStyle: "cukiBoldMeme",
+  globalImageEffect: "slowZoomIn",
   globalTransition: "hardCut",
   effectSpeed: "normal",
   transitionDuration: 0.25,
   subtitleMode: "full",
+  subtitleSize: "normal",
+  subtitlePosition: "lowerThird",
   scenes: [
     {
       id: "default-scene",
