@@ -3,15 +3,16 @@
 import {useEffect, useMemo, useState} from "react";
 import {createPortal} from "react-dom";
 import type {CukiProject} from "@/lib/types";
-import {getDurationDifference, getTotalSceneDuration} from "@/lib/timing";
-import {getAssignedSrtCueIndexes, getSceneSrtTiming, getSrtDuration} from "@/lib/srt";
+import {getProjectTimelineDuration} from "@/lib/timing";
+import {validateForRender} from "@/lib/renderValidation";
 import {downloadBlob, formatSeconds} from "@/lib/utils";
 
 export function RenderPanel({project, onSave}: {project: CukiProject; onSave: () => void}) {
   const [isRendering, setIsRendering] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const warnings = validateForRender(project);
+  const validation = validateForRender(project);
+  const hasBlockingErrors = validation.errors.length > 0;
   const renderEstimate = useMemo(() => getRenderEstimate(project), [project]);
 
   useEffect(() => {
@@ -24,6 +25,11 @@ export function RenderPanel({project, onSave}: {project: CukiProject; onSave: ()
   }, [isRendering]);
 
   async function render() {
+    if (hasBlockingErrors) {
+      setStatus("Fix the required render checks before exporting MP4.");
+      return;
+    }
+
     onSave();
     setIsRendering(true);
     setElapsedSeconds(0);
@@ -55,21 +61,30 @@ export function RenderPanel({project, onSave}: {project: CukiProject; onSave: ()
       <h2 className="text-2xl font-extrabold text-white">Render MP4</h2>
       <p className="mt-1 text-sm text-studio-muted">Exports a 1080x1920, 30fps MP4 with VO, subtitles, image motion, and transitions.</p>
 
-      {warnings.length > 0 ? (
-        <div className="soft-warning mt-5 rounded-2xl p-4">
-          <p className="font-extrabold">Before final render</p>
+      {validation.errors.length > 0 ? (
+        <div className="mt-5 rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-red-100">
+          <p className="font-extrabold">Required before render</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-            {warnings.map((warning) => <li key={warning}>{warning}</li>)}
+            {validation.errors.map((error) => <li key={error}>{error}</li>)}
+          </ul>
+        </div>
+      ) : null}
+
+      {validation.warnings.length > 0 ? (
+        <div className="soft-warning mt-5 rounded-2xl p-4">
+          <p className="font-extrabold">Recommended checks</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+            {validation.warnings.map((warning) => <li key={warning}>{warning}</li>)}
           </ul>
         </div>
       ) : null}
 
       <button
         onClick={render}
-        disabled={isRendering}
+        disabled={isRendering || hasBlockingErrors}
         className="btn-primary mt-5 w-full px-5 py-4"
       >
-        {isRendering ? "Rendering MP4..." : "Render & Download MP4"}
+        {isRendering ? "Rendering MP4..." : hasBlockingErrors ? "Complete Required Checks" : "Render & Download MP4"}
       </button>
       {isRendering ? <RenderOverlay elapsedSeconds={elapsedSeconds} estimateSeconds={renderEstimate} title={project.title} /> : null}
       {status ? <p className="mt-4 text-sm text-studio-muted">{status}</p> : null}
@@ -152,42 +167,10 @@ function getRenderStage(progress: number, elapsedSeconds: number) {
 }
 
 function getRenderEstimate(project: CukiProject) {
-  const videoDuration = project.audioDuration ?? (project.audioMode === "fullVoSrt" ? getSrtDuration(project.srtCues) : getTotalSceneDuration(project.scenes));
+  const videoDuration = getProjectTimelineDuration(project);
   const sceneWeight = Math.max(1, project.scenes.length) * 1.4;
   const durationWeight = Math.max(8, videoDuration * 1.8);
   return Math.min(240, Math.max(24, Math.round(durationWeight + sceneWeight)));
-}
-
-function validateForRender(project: CukiProject) {
-  const warnings: string[] = [];
-  if (!project.audioUrl) warnings.push("No VO audio uploaded yet.");
-  if (project.audioUrl && !project.audioDuration) warnings.push("Load audio duration before final timing.");
-  if (project.audioMode === "fullVoSrt") {
-    const cues = project.srtCues ?? [];
-    const srtDuration = getSrtDuration(cues);
-    const assigned = getAssignedSrtCueIndexes(project.scenes);
-    const assignedCueCount = cues.filter((cue) => assigned.has(cue.index)).length;
-    if (cues.length === 0) warnings.push("No SRT cues parsed yet.");
-    if (cues.length > 0 && assignedCueCount < cues.length) warnings.push(`${cues.length - assignedCueCount} SRT cue${cues.length - assignedCueCount === 1 ? "" : "s"} are not assigned to any scene.`);
-    const unmappedScenes = project.scenes.filter((scene) => !getSceneSrtTiming(scene, cues));
-    if (unmappedScenes.length > 0) warnings.push(`${unmappedScenes.length} scene${unmappedScenes.length === 1 ? "" : "s"} are not mapped to SRT cues.`);
-    if (project.audioDuration && srtDuration > 0) {
-      const difference = srtDuration - project.audioDuration;
-      if (difference > 0.75) warnings.push(`SRT is ${formatSeconds(difference)} longer than audio.`);
-      if (difference < -0.75) warnings.push(`SRT ends ${formatSeconds(Math.abs(difference))} before audio ends.`);
-    }
-  }
-  if (project.scenes.length === 0) warnings.push("Add at least one scene.");
-  project.scenes.forEach((scene, index) => {
-    if (!scene.imageUrl) warnings.push(`Scene ${index + 1}: add a panel image.`);
-    if (project.audioMode !== "fullVoSrt" && !scene.subtitle.trim()) warnings.push(`Scene ${index + 1}: add subtitle text.`);
-    if (project.audioMode !== "fullVoSrt" && scene.duration < 2) warnings.push(`Scene ${index + 1}: duration is shorter than 2 seconds.`);
-  });
-  if (project.audioMode !== "fullVoSrt" && project.audioDuration && Math.abs(getDurationDifference(project)) > 0.5) {
-    const difference = getDurationDifference(project);
-    warnings.push(`Scene timing is ${formatSeconds(Math.abs(difference))} ${difference < 0 ? "shorter" : "longer"} than VO.`);
-  }
-  return warnings;
 }
 
 function safeFilename(input: string) {

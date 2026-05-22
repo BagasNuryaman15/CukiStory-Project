@@ -3,7 +3,7 @@
 import {useEffect, useState} from "react";
 import type {AudioMode, CukiScene, SrtCue} from "@/lib/types";
 import {transitionDurations} from "@/lib/presets";
-import {formatShortTimestamp, getSceneSrtCues, getSceneSrtTiming} from "@/lib/srt";
+import {formatShortTimestamp, getSceneSrtCueRange, getSceneSrtCues, getSceneSrtTiming} from "@/lib/srt";
 import type {SceneVisualTiming} from "@/lib/srt";
 import {fileToDataUrl, formatSeconds} from "@/lib/utils";
 import {EffectPicker} from "./EffectPicker";
@@ -28,6 +28,9 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
   const isSrtMode = audioMode === "fullVoSrt";
   const srtTiming = isSrtMode ? visualTiming ?? getSceneSrtTiming(scene, srtCues) : null;
   const mappedCues = isSrtMode ? getSceneSrtCues(scene, srtCues) : [];
+  const mappedCueRange = isSrtMode ? getSceneSrtCueRange(scene, srtCues) : null;
+  const selectedStartCueId = getSelectedCueId(scene.srtCueStartId, srtCues, mappedCueRange?.cues[0]?.id);
+  const selectedEndCueId = getSelectedCueId(scene.srtCueEndId, srtCues, mappedCueRange?.cues[mappedCueRange.cues.length - 1]?.id);
   const effectiveDuration = srtTiming?.duration ?? scene.duration;
   const shiftedByPrevious = getShiftedByPrevious(srtTiming);
   const warnings = getSceneWarnings(scene, isSrtMode, mappedCues.length > 0);
@@ -42,12 +45,16 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
     }
   }
 
-  function updateSrtMapping(nextStart: number | null, nextEnd: number | null) {
+  function updateSrtMapping(nextStartId: string | null, nextEndId: string | null) {
+    const startCue = nextStartId ? srtCues.find((cue) => cue.id === nextStartId) : null;
+    const endCue = nextEndId ? srtCues.find((cue) => cue.id === nextEndId) : null;
     const nextScene = {
       ...scene,
-      srtCueStartIndex: nextStart,
-      srtCueEndIndex: nextEnd,
-      timingSource: nextStart != null && nextEnd != null ? "synced" as const : scene.timingSource,
+      srtCueStartId: nextStartId,
+      srtCueEndId: nextEndId,
+      srtCueStartIndex: startCue?.index ?? null,
+      srtCueEndIndex: endCue?.index ?? null,
+      timingSource: nextStartId != null && nextEndId != null ? "synced" as const : scene.timingSource,
     };
     const timing = getSceneSrtTiming(nextScene, srtCues);
     onChange({
@@ -181,22 +188,22 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Start subtitle cue">
                   <select
-                    value={scene.srtCueStartIndex ?? ""}
-                    onChange={(event) => updateSrtMapping(event.target.value ? Number(event.target.value) : null, scene.srtCueEndIndex ?? null)}
+                    value={selectedStartCueId}
+                    onChange={(event) => updateSrtMapping(event.target.value || null, selectedEndCueId || null)}
                     className="studio-input w-full rounded-xl px-3 py-2 text-sm"
                   >
                     <option value="">Select start cue</option>
-                    {srtCues.map((cue) => <option key={cue.id} value={cue.index}>{cueLabel(cue)}</option>)}
+                    {srtCues.map((cue) => <option key={cue.id} value={cue.id}>{cueLabel(cue)}</option>)}
                   </select>
                 </Field>
                 <Field label="End subtitle cue">
                   <select
-                    value={scene.srtCueEndIndex ?? ""}
-                    onChange={(event) => updateSrtMapping(scene.srtCueStartIndex ?? null, event.target.value ? Number(event.target.value) : null)}
+                    value={selectedEndCueId}
+                    onChange={(event) => updateSrtMapping(selectedStartCueId || null, event.target.value || null)}
                     className="studio-input w-full rounded-xl px-3 py-2 text-sm"
                   >
                     <option value="">Select end cue</option>
-                    {srtCues.map((cue) => <option key={cue.id} value={cue.index}>{cueLabel(cue)}</option>)}
+                    {srtCues.map((cue) => <option key={cue.id} value={cue.id}>{cueLabel(cue)}</option>)}
                   </select>
                 </Field>
               </div>
@@ -266,6 +273,11 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
 function getShiftedByPrevious(timing: ReturnType<typeof getSceneSrtTiming> | SceneVisualTiming | null) {
   if (!timing || !("shiftedByPrevious" in timing) || typeof timing.shiftedByPrevious !== "number") return 0;
   return timing.shiftedByPrevious;
+}
+
+function getSelectedCueId(cueId: string | null | undefined, cues: SrtCue[], fallbackCueId: string | undefined) {
+  if (cueId && cues.some((cue) => cue.id === cueId)) return cueId;
+  return fallbackCueId ?? "";
 }
 
 function MappedSrtPreview({mappedCues}: {mappedCues: SrtCue[]}) {

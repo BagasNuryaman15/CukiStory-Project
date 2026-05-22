@@ -1,7 +1,7 @@
 import {AbsoluteFill, Audio, Sequence} from "remotion";
 import type {CukiProject} from "../lib/types";
-import {getTotalSceneDuration} from "../lib/timing";
-import {getSceneVisualTimings, getSrtDuration} from "../lib/srt";
+import {getProjectTimelineDuration} from "../lib/timing";
+import {getSceneVisualTimings} from "../lib/srt";
 import {Scene} from "./Scene";
 import {SrtSubtitleTrack} from "./Subtitle";
 
@@ -53,12 +53,5 @@ export function CukiStoryComposition({project}: {project: CukiProject}) {
 }
 
 export function getProjectDurationInFrames(project: CukiProject) {
-  if (project.audioMode === "fullVoSrt") {
-    const visualTimings = getSceneVisualTimings(project.scenes, project.srtCues);
-    const mappedSceneEnd = Math.max(0, ...visualTimings.map((timing) => timing?.end ?? 0));
-    const duration = Math.max(project.audioDuration ?? 0, getSrtDuration(project.srtCues), mappedSceneEnd, getTotalSceneDuration(project.scenes));
-    return Math.max(1, Math.ceil(duration * project.fps));
-  }
-
-  return Math.max(1, Math.ceil(getTotalSceneDuration(project.scenes) * project.fps));
+  return Math.max(1, Math.ceil(getProjectTimelineDuration(project) * project.fps));
 }

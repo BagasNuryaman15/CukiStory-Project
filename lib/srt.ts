@@ -28,7 +28,7 @@ export function parseSrt(srtText: string): SrtCue[] {
     .flatMap((block, blockIndex) => parseSrtBlock(block, blockIndex))
     .filter((cue) => cue.end > cue.start && cue.text.length > 0)
     .sort((a, b) => a.start - b.start)
-    .map((cue, index) => ({...cue, id: cue.id || `srt-${cue.index || index + 1}`}));
+    .map((cue, index) => ({...cue, id: createStableCueId(cue, index)}));
 }
 
 export function parseSrtTimestamp(timestamp: string): number {
@@ -68,11 +68,36 @@ export function getSrtDuration(cues: SrtCue[] | undefined) {
   return Math.max(...cues.map((cue) => cue.end));
 }
 
-export function getSceneSrtCues(scene: Pick<CukiScene, "srtCueStartIndex" | "srtCueEndIndex">, cues: SrtCue[] | undefined) {
-  if (!cues || cues.length === 0 || scene.srtCueStartIndex == null || scene.srtCueEndIndex == null) return [];
-  const start = Math.min(scene.srtCueStartIndex, scene.srtCueEndIndex);
-  const end = Math.max(scene.srtCueStartIndex, scene.srtCueEndIndex);
-  return cues.filter((cue) => cue.index >= start && cue.index <= end);
+export function getSceneSrtCueRange(
+  scene: Pick<CukiScene, "srtCueStartId" | "srtCueEndId" | "srtCueStartIndex" | "srtCueEndIndex">,
+  cues: SrtCue[] | undefined,
+) {
+  if (!cues || cues.length === 0) return null;
+
+  if (scene.srtCueStartId && scene.srtCueEndId) {
+    const startPosition = cues.findIndex((cue) => cue.id === scene.srtCueStartId);
+    const endPosition = cues.findIndex((cue) => cue.id === scene.srtCueEndId);
+    if (startPosition !== -1 && endPosition !== -1) {
+      const start = Math.min(startPosition, endPosition);
+      const end = Math.max(startPosition, endPosition);
+      return {start, end, cues: cues.slice(start, end + 1)};
+    }
+  }
+
+  if (scene.srtCueStartIndex == null || scene.srtCueEndIndex == null) return null;
+  const startIndex = Math.min(scene.srtCueStartIndex, scene.srtCueEndIndex);
+  const endIndex = Math.max(scene.srtCueStartIndex, scene.srtCueEndIndex);
+  const legacyCues = cues.filter((cue) => cue.index >= startIndex && cue.index <= endIndex);
+  if (legacyCues.length === 0) return null;
+
+  const positions = legacyCues.map((cue) => cues.findIndex((item) => item.id === cue.id)).filter((position) => position !== -1);
+  const start = Math.min(...positions);
+  const end = Math.max(...positions);
+  return {start, end, cues: cues.slice(start, end + 1)};
+}
+
+export function getSceneSrtCues(scene: Pick<CukiScene, "srtCueStartId" | "srtCueEndId" | "srtCueStartIndex" | "srtCueEndIndex">, cues: SrtCue[] | undefined) {
+  return getSceneSrtCueRange(scene, cues)?.cues ?? [];
 }
 
 export function getSceneSrtTiming(scene: CukiScene, cues: SrtCue[] | undefined): SceneSrtTiming | null {
@@ -128,13 +153,10 @@ export function getSceneVisualTimings(scenes: CukiScene[], cues: SrtCue[] | unde
   });
 }
 
-export function getAssignedSrtCueIndexes(scenes: CukiScene[]) {
-  const assigned = new Set<number>();
+export function getAssignedSrtCueIds(scenes: CukiScene[], cues: SrtCue[] | undefined) {
+  const assigned = new Set<string>();
   scenes.forEach((scene) => {
-    if (scene.srtCueStartIndex == null || scene.srtCueEndIndex == null) return;
-    const start = Math.min(scene.srtCueStartIndex, scene.srtCueEndIndex);
-    const end = Math.max(scene.srtCueStartIndex, scene.srtCueEndIndex);
-    for (let index = start; index <= end; index += 1) assigned.add(index);
+    getSceneSrtCues(scene, cues).forEach((cue) => assigned.add(cue.id));
   });
   return assigned;
 }
@@ -151,6 +173,8 @@ export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {
     if (cuePointer >= sortedCues.length) {
       return {
         ...scene,
+        srtCueStartId: null,
+        srtCueEndId: null,
         srtCueStartIndex: null,
         srtCueEndIndex: null,
         srtStartOffset: scene.srtStartOffset ?? 0,
@@ -174,6 +198,8 @@ export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {
     const duration = Math.max(0.1, sortedCues[endCue].end - sortedCues[startCue].start);
     return {
       ...scene,
+      srtCueStartId: sortedCues[startCue].id,
+      srtCueEndId: sortedCues[endCue].id,
       srtCueStartIndex: sortedCues[startCue].index,
       srtCueEndIndex: sortedCues[endCue].index,
       srtStartOffset: scene.srtStartOffset ?? 0,
@@ -201,12 +227,26 @@ function parseSrtBlock(block: string, blockIndex: number): SrtCue[] {
   if (!Number.isFinite(start) || !Number.isFinite(end)) return [];
 
   return [{
-    id: `srt-${indexFromFile}-${Math.round(start * 1000)}`,
+    id: "",
     index: indexFromFile,
     start,
     end,
     text,
   }];
+}
+
+function createStableCueId(cue: SrtCue, position: number) {
+  const start = Math.round(cue.start * 1000);
+  const end = Math.round(cue.end * 1000);
+  return `srt-cue-${position + 1}-${start}-${end}-${hashCueText(cue.text)}`;
+}
+
+function hashCueText(text: string) {
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
 }
 
 function pad(value: number) {

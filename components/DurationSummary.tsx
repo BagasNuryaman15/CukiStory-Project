@@ -1,26 +1,27 @@
 "use client";
 
 import type {CukiProject} from "@/lib/types";
-import {getDurationDifference, getTotalSceneDuration} from "@/lib/timing";
-import {getAssignedSrtCueIndexes, getSceneVisualTimings, getSrtDuration} from "@/lib/srt";
+import {getDurationDifference, getProjectTimelineDuration, getSrtVisualDuration, getTotalSceneDuration} from "@/lib/timing";
+import {getAssignedSrtCueIds, getSrtDuration} from "@/lib/srt";
 import {formatSeconds} from "@/lib/utils";
 
 export function DurationSummary({project}: {project: CukiProject}) {
   if (project.audioMode === "fullVoSrt") {
     const cues = project.srtCues ?? [];
     const srtDuration = getSrtDuration(cues);
-    const visualTimings = getSceneVisualTimings(project.scenes, cues);
-    const visualDuration = Math.max(0, ...visualTimings.map((timing) => timing?.end ?? 0));
-    const assignedCueIndexes = getAssignedSrtCueIndexes(project.scenes);
-    const assignedCount = cues.filter((cue) => assignedCueIndexes.has(cue.index)).length;
+    const visualDuration = getSrtVisualDuration(project.scenes, cues);
+    const finalDuration = getProjectTimelineDuration(project);
+    const assignedCueIds = getAssignedSrtCueIds(project.scenes, cues);
+    const assignedCount = cues.filter((cue) => assignedCueIds.has(cue.id)).length;
     const unassignedCount = Math.max(0, cues.length - assignedCount);
     const audioSrtDiff = project.audioDuration && srtDuration ? srtDuration - project.audioDuration : 0;
 
     return (
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-5">
         <Panel label="Audio Duration" value={project.audioDuration ? formatSeconds(project.audioDuration) : "Add audio"} tone={!project.audioDuration ? "guide" : "normal"} />
         <Panel label="SRT Duration" value={srtDuration ? formatSeconds(srtDuration) : "Add SRT"} tone={!srtDuration ? "guide" : Math.abs(audioSrtDiff) > 0.75 ? "warn" : "normal"} />
         <Panel label="Visual Duration" value={formatSeconds(visualDuration)} tone="normal" />
+        <Panel label="Final Duration" value={formatSeconds(finalDuration)} tone="normal" />
         <Panel label="Unassigned Cues" value={`${unassignedCount}`} tone={unassignedCount > 0 ? "warn" : "normal"} />
       </div>
     );

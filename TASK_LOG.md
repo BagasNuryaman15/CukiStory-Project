@@ -123,3 +123,31 @@ Catatan ini dipakai sebagai laporan kerja ringan setiap selesai revisi. Formatny
 - Mengubah render activity menjadi modal overlay di tengah layar agar proses export terasa lebih jelas dan fokus.
 - Memindahkan modal render ke `document.body` lewat React portal supaya benar-benar center viewport dan tidak terkunci di card preview.
 - Menambahkan cyberpunk grid overlay, corner brackets, dan equalizer animation pada render modal.
+
+### Render validation blocking
+
+- Memisahkan validasi render menjadi required checks dan recommended checks.
+- Memblokir tombol render saat VO, durasi audio, scene, image, subtitle, SRT file, atau SRT mapping wajib belum lengkap.
+- Menjaga mismatch timing/durasi sebagai warning agar creator tetap bisa menilai sendiri sebelum export.
+- Menambahkan guard di handler render supaya export tidak berjalan jika required checks masih gagal.
+
+### Timeline duration source of truth
+
+- Menambahkan helper durasi timeline final per audio mode agar preview/render memakai aturan durasi yang sama.
+- Mode Full VO + SRT sekarang menghitung durasi final dari audio duration, SRT duration, dan visual mapped scene end.
+- Menghapus `scene.duration` lama sebagai penentu durasi akhir di SRT mode agar tidak membuat black tail dari data stale.
+- Menambahkan Final Duration di ringkasan SRT agar durasi composition yang akan dirender terlihat eksplisit.
+
+### Stable SRT cue mapping
+
+- Menambahkan mapping SRT baru berbasis `cue.id` agar scene tidak bergantung pada nomor cue dari file SRT.
+- Parser SRT sekarang membuat id cue internal dari posisi hasil sort, timestamp, dan hash text.
+- Helper mapping tetap fallback ke `srtCueStartIndex` dan `srtCueEndIndex` lama agar project existing masih terbaca.
+- UI manual mapping, auto map, render validation, checklist, dan duration summary sekarang menghitung assigned cue berdasarkan id.
+
+### Timing and SRT tests
+
+- Menambahkan test runner `npm test` berbasis TypeScript compile + Node built-in test runner tanpa dependency baru.
+- Menambahkan unit test untuk parser SRT timestamp koma/titik, sort cue, stable cue id, duplicate SRT index, auto map, dan visual hold timing.
+- Menambahkan unit test durasi timeline agar mode SRT tidak tertarik oleh `scene.duration` stale.
+- Memindahkan render validation ke helper murni dan menambahkan test untuk blocking errors serta project SRT lengkap.

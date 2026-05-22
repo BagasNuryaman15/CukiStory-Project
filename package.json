@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/*.test.js",
     "lint": "next lint",
     "remotion:studio": "remotion studio remotion/index.ts",
     "remotion:render": "remotion render remotion/index.ts CukiStoryVideo out/cukistory.mp4"

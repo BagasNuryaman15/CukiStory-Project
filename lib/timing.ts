@@ -1,4 +1,5 @@
 import type {CukiProject, CukiScene, TimingSource} from "./types";
+import {getSceneVisualTimings, getSrtDuration} from "./srt";
 
 export const DEFAULT_WPM = 150;
 export const MIN_SCENE_DURATION = 2;
@@ -10,6 +11,19 @@ const ENDING_HOLD_SECONDS = 0.5;
 
 export function getTotalSceneDuration(scenes: CukiScene[]) {
   return scenes.reduce((total, scene) => total + (Number.isFinite(scene.duration) ? scene.duration : 0), 0);
+}
+
+export function getSrtVisualDuration(scenes: CukiScene[], cues: CukiProject["srtCues"]) {
+  const visualTimings = getSceneVisualTimings(scenes, cues);
+  return Math.max(0, ...visualTimings.map((timing) => timing?.end ?? 0));
+}
+
+export function getProjectTimelineDuration(project: Pick<CukiProject, "audioMode" | "audioDuration" | "srtCues" | "scenes">) {
+  if (project.audioMode === "fullVoSrt") {
+    return Math.max(project.audioDuration ?? 0, getSrtDuration(project.srtCues), getSrtVisualDuration(project.scenes, project.srtCues));
+  }
+
+  return getTotalSceneDuration(project.scenes);
 }
 
 export function getDurationDifference(project: Pick<CukiProject, "scenes" | "audioDuration">) {

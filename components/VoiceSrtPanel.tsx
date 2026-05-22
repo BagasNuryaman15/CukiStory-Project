@@ -2,7 +2,7 @@
 
 import {useRef, useState} from "react";
 import type {AudioMode, CukiProject} from "@/lib/types";
-import {autoMapSrtToScenes, formatShortTimestamp, getAssignedSrtCueIndexes, getSrtDuration, parseSrt} from "@/lib/srt";
+import {autoMapSrtToScenes, formatShortTimestamp, getAssignedSrtCueIds, getSrtDuration, parseSrt} from "@/lib/srt";
 import {formatSeconds, reorderScenes} from "@/lib/utils";
 import {AudioUploader} from "./AudioUploader";
 import {DurationSummary} from "./DurationSummary";
@@ -12,8 +12,8 @@ export function VoiceSrtPanel({project, onChange}: {project: CukiProject; onChan
   const [srtError, setSrtError] = useState<string | null>(null);
   const srtCues = project.srtCues ?? [];
   const srtDuration = getSrtDuration(srtCues);
-  const assignedCueIndexes = getAssignedSrtCueIndexes(project.scenes);
-  const assignedCueCount = srtCues.filter((cue) => assignedCueIndexes.has(cue.index)).length;
+  const assignedCueIds = getAssignedSrtCueIds(project.scenes, srtCues);
+  const assignedCueCount = srtCues.filter((cue) => assignedCueIds.has(cue.id)).length;
   const warnings = getVoiceSrtWarnings(project);
 
   async function handleSrtFile(file: File | undefined) {

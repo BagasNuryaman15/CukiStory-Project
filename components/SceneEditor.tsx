@@ -53,7 +53,14 @@ export function SceneEditor({
   }
 
   function clearMapping() {
-    onChange(scenes.map((scene) => ({...scene, srtCueStartIndex: null, srtCueEndIndex: null, manualDurationOverride: false})));
+    onChange(scenes.map((scene) => ({
+      ...scene,
+      srtCueStartId: null,
+      srtCueEndId: null,
+      srtCueStartIndex: null,
+      srtCueEndIndex: null,
+      manualDurationOverride: false,
+    })));
   }
 
   function autoMap() {

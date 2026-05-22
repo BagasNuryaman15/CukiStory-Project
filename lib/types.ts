@@ -62,6 +62,8 @@ export type CukiScene = {
   duration: number;
   timingSource?: TimingSource;
   note?: string;
+  srtCueStartId?: string | null;
+  srtCueEndId?: string | null;
   srtCueStartIndex?: number | null;
   srtCueEndIndex?: number | null;
   srtStartOffset?: number;

@@ -11,7 +11,7 @@ import type {CukiProject} from "@/lib/types";
 import {autoDistributeDurations, normalizeDurations} from "@/lib/timing";
 import {getProject, saveProject} from "@/lib/storage";
 import {templates} from "@/lib/presets";
-import {getAssignedSrtCueIndexes, getSceneSrtTiming} from "@/lib/srt";
+import {getAssignedSrtCueIds, getSceneSrtTiming} from "@/lib/srt";
 import {reorderScenes} from "@/lib/utils";
 
 export function ProjectEditor({projectId}: {projectId: string}) {
@@ -338,8 +338,8 @@ function ActiveStepHint({activeStep, onPreview}: {activeStep: EditorStep; onPrev
 
 function FinalChecklist({project}: {project: CukiProject}) {
   const srtCues = project.srtCues ?? [];
-  const assignedCueIndexes = getAssignedSrtCueIndexes(project.scenes);
-  const assignedCueCount = srtCues.filter((cue) => assignedCueIndexes.has(cue.index)).length;
+  const assignedCueIds = getAssignedSrtCueIds(project.scenes, srtCues);
+  const assignedCueCount = srtCues.filter((cue) => assignedCueIds.has(cue.id)).length;
   const mappedSceneCount = project.scenes.filter((scene) => getSceneSrtTiming(scene, srtCues)).length;
   const subtitleModeLabel = {
     full: "Full subtitle chunks enabled",
