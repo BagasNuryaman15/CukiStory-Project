@@ -1,5 +1,22 @@
 import type {CukiScene, SrtCue} from "./types";
 
+export type SceneSrtTiming = {
+  start: number;
+  end: number;
+  duration: number;
+  baseStart: number;
+  baseEnd: number;
+  startOffset: number;
+  endHold: number;
+  cues: SrtCue[];
+};
+
+export type SceneVisualTiming = SceneSrtTiming & {
+  sceneId: string;
+  desiredStart: number;
+  shiftedByPrevious: number;
+};
+
 const TIMESTAMP_LINE = /(\d{1,2}:\d{2}:\d{2}[,.]\d{1,3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,.]\d{1,3})/;
 
 export function parseSrt(srtText: string): SrtCue[] {
@@ -58,7 +75,7 @@ export function getSceneSrtCues(scene: Pick<CukiScene, "srtCueStartIndex" | "srt
   return cues.filter((cue) => cue.index >= start && cue.index <= end);
 }
 
-export function getSceneSrtTiming(scene: CukiScene, cues: SrtCue[] | undefined) {
+export function getSceneSrtTiming(scene: CukiScene, cues: SrtCue[] | undefined): SceneSrtTiming | null {
   const sceneCues = getSceneSrtCues(scene, cues);
   if (sceneCues.length === 0) return null;
 
@@ -82,6 +99,33 @@ export function getSceneSrtTiming(scene: CukiScene, cues: SrtCue[] | undefined) 
     endHold,
     cues: sceneCues,
   };
+}
+
+export function getSceneVisualTimings(scenes: CukiScene[], cues: SrtCue[] | undefined): Array<SceneVisualTiming | null> {
+  let previousEnd = 0;
+
+  return scenes.map((scene) => {
+    const timing = getSceneSrtTiming(scene, cues);
+    if (!timing) return null;
+
+    const desiredStart = timing.start;
+    const start = Math.max(desiredStart, previousEnd);
+    const automaticEnd = Math.max(start + 0.1, start + timing.duration);
+    const end = scene.manualDurationOverride && Number.isFinite(scene.duration)
+      ? Math.max(start + 0.1, start + scene.duration)
+      : automaticEnd;
+    previousEnd = end;
+
+    return {
+      ...timing,
+      sceneId: scene.id,
+      start,
+      end,
+      duration: Math.max(0.1, end - start),
+      desiredStart,
+      shiftedByPrevious: Math.max(0, start - desiredStart),
+    };
+  });
 }
 
 export function getAssignedSrtCueIndexes(scenes: CukiScene[]) {
@@ -109,8 +153,8 @@ export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {
         ...scene,
         srtCueStartIndex: null,
         srtCueEndIndex: null,
-        srtStartOffset: scene.srtStartOffset ?? -0.2,
-        srtEndHold: scene.srtEndHold ?? 0.35,
+        srtStartOffset: scene.srtStartOffset ?? 0,
+        srtEndHold: scene.srtEndHold ?? 0,
         manualDurationOverride: false,
       };
     }
@@ -132,9 +176,9 @@ export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {
       ...scene,
       srtCueStartIndex: sortedCues[startCue].index,
       srtCueEndIndex: sortedCues[endCue].index,
-      srtStartOffset: scene.srtStartOffset ?? -0.2,
-      srtEndHold: scene.srtEndHold ?? 0.35,
-      duration: duration + Math.abs(Math.min(0, scene.srtStartOffset ?? -0.2)) + Math.max(0, scene.srtEndHold ?? 0.35),
+      srtStartOffset: scene.srtStartOffset ?? 0,
+      srtEndHold: scene.srtEndHold ?? 0,
+      duration: duration + Math.abs(Math.min(0, scene.srtStartOffset ?? 0)) + Math.max(0, scene.srtEndHold ?? 0),
       timingSource: "synced" as const,
       manualDurationOverride: false,
     };

@@ -4,6 +4,7 @@ import {useEffect, useState} from "react";
 import type {AudioMode, CukiScene, SrtCue} from "@/lib/types";
 import {transitionDurations} from "@/lib/presets";
 import {formatShortTimestamp, getSceneSrtCues, getSceneSrtTiming} from "@/lib/srt";
+import type {SceneVisualTiming} from "@/lib/srt";
 import {fileToDataUrl, formatSeconds} from "@/lib/utils";
 import {EffectPicker} from "./EffectPicker";
 import {TransitionPicker} from "./TransitionPicker";
@@ -20,13 +21,15 @@ type SceneCardProps = {
   onMoveDown: () => void;
   audioMode?: AudioMode;
   srtCues?: SrtCue[];
+  visualTiming?: SceneVisualTiming | null;
 };
 
-export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate, onDelete, onMoveUp, onMoveDown, audioMode, srtCues = []}: SceneCardProps) {
+export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate, onDelete, onMoveUp, onMoveDown, audioMode, srtCues = [], visualTiming}: SceneCardProps) {
   const isSrtMode = audioMode === "fullVoSrt";
-  const srtTiming = isSrtMode ? getSceneSrtTiming(scene, srtCues) : null;
+  const srtTiming = isSrtMode ? visualTiming ?? getSceneSrtTiming(scene, srtCues) : null;
   const mappedCues = isSrtMode ? getSceneSrtCues(scene, srtCues) : [];
   const effectiveDuration = srtTiming?.duration ?? scene.duration;
+  const shiftedByPrevious = getShiftedByPrevious(srtTiming);
   const warnings = getSceneWarnings(scene, isSrtMode, mappedCues.length > 0);
 
   async function handleImage(file: File | undefined) {
@@ -146,14 +149,16 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
             <Field label="Image Effect">
               <EffectPicker value={scene.effect} onChange={(effect) => onChange({...scene, effect})} />
             </Field>
-            <Field label="Transition to next scene">
-              <TransitionPicker value={scene.transition} onChange={(transition) => onChange({...scene, transition})} />
+            <Field label={isLast ? "Transition to next scene (none)" : "Transition to next scene"}>
+              <TransitionPicker value={scene.transition} disabled={isLast} onChange={(transition) => onChange({...scene, transition})} />
+              {isLast ? <p className="mt-2 text-xs text-studio-muted">Last scene has no outgoing transition.</p> : null}
             </Field>
             <Field label="Transition duration">
               <select
                 value={scene.transitionDuration ?? 0.25}
+                disabled={isLast}
                 onChange={(event) => onChange({...scene, transitionDuration: Number(event.target.value)})}
-                className="studio-input w-full rounded-xl px-3 py-2 text-sm"
+                className="studio-input w-full rounded-xl px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-55"
               >
                 {transitionDurations.map((duration) => (
                   <option key={duration.value} value={duration.value}>{duration.label}</option>
@@ -196,25 +201,25 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
                 </Field>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field label="Visual start offset">
+                <Field label="Image start offset">
                   <NumberInput
-                    value={scene.srtStartOffset ?? -0.2}
+                    value={scene.srtStartOffset ?? 0}
                     min={-10}
                     max={10}
                     step={0.1}
                     onCommit={(srtStartOffset) => updateVisualTiming({...scene, srtStartOffset})}
                   />
-                  <p className="mt-2 text-xs text-studio-muted">Negative starts the image before the first subtitle cue.</p>
+                  <p className="mt-2 text-xs text-studio-muted">Negative asks this image to start before the first mapped cue.</p>
                 </Field>
-                <Field label="End hold">
+                <Field label="Hold image after cue">
                   <NumberInput
-                    value={scene.srtEndHold ?? 0.35}
+                    value={scene.srtEndHold ?? 0}
                     min={0}
                     max={10}
                     step={0.1}
                     onCommit={(srtEndHold) => updateVisualTiming({...scene, srtEndHold})}
                   />
-                  <p className="mt-2 text-xs text-studio-muted">Keeps the image visible after the last mapped cue.</p>
+                  <p className="mt-2 text-xs text-studio-muted">Keeps this image visible and delays the next image scene.</p>
                 </Field>
               </div>
               <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3">
@@ -225,9 +230,12 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
                     : "No SRT timing mapped yet."}
                 </p>
                 {srtTiming ? (
-                  <p className="mt-2 text-xs text-studio-muted">
-                    Cue timing: {formatShortTimestamp(srtTiming.baseStart)} - {formatShortTimestamp(srtTiming.baseEnd)}
-                  </p>
+                  <div className="mt-2 space-y-1 text-xs text-studio-muted">
+                    <p>Cue timing: {formatShortTimestamp(srtTiming.baseStart)} - {formatShortTimestamp(srtTiming.baseEnd)}</p>
+                    {shiftedByPrevious > 0 ? (
+                      <p>This image waits {formatSeconds(shiftedByPrevious)} because the previous scene is holding.</p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -253,6 +261,11 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
       </div>
     </article>
   );
+}
+
+function getShiftedByPrevious(timing: ReturnType<typeof getSceneSrtTiming> | SceneVisualTiming | null) {
+  if (!timing || !("shiftedByPrevious" in timing) || typeof timing.shiftedByPrevious !== "number") return 0;
+  return timing.shiftedByPrevious;
 }
 
 function MappedSrtPreview({mappedCues}: {mappedCues: SrtCue[]}) {

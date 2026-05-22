@@ -140,3 +140,173 @@ button:disabled {
   background: linear-gradient(120deg, rgba(56, 216, 255, 0.7), rgba(95, 124, 255, 0.15), rgba(255, 79, 216, 0.55));
   content: "";
 }
+
+.render-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background:
+    linear-gradient(rgba(56, 216, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 216, 255, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 50% 35%, rgba(56, 216, 255, 0.14), transparent 28rem),
+    rgba(0, 0, 0, 0.78);
+  background-size: 46px 46px, 46px 46px, auto, auto;
+  backdrop-filter: blur(12px);
+}
+
+.render-activity {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    0 30px 110px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 46px rgba(56, 216, 255, 0.2);
+}
+
+.render-activity::before {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(56, 216, 255, 0.08) 42%, rgba(255, 255, 255, 0.14) 50%, rgba(95, 124, 255, 0.08) 58%, transparent 100%);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-100%);
+  animation: render-scan 2.4s ease-in-out infinite;
+}
+
+.render-activity::after {
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(56, 216, 255, 0.18), transparent 16rem),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(145deg, rgba(21, 26, 50, 0.96), rgba(7, 8, 23, 0.98));
+  background-size: auto, 100% 8px, auto;
+  content: "";
+}
+
+.render-corner {
+  position: absolute;
+  z-index: 1;
+  width: 58px;
+  height: 58px;
+  border-color: rgba(56, 216, 255, 0.78);
+  pointer-events: none;
+}
+
+.render-corner-tl {
+  top: 14px;
+  left: 14px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.render-corner-br {
+  right: 14px;
+  bottom: 14px;
+  border-right: 2px solid;
+  border-bottom: 2px solid;
+}
+
+.render-orbit {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, rgba(56, 216, 255, 0.16), transparent 56%),
+    conic-gradient(from 90deg, rgba(56, 216, 255, 0.12), #38d8ff, #5f7cff, rgba(56, 216, 255, 0.12));
+  animation: render-spin 1.35s linear infinite;
+  box-shadow: 0 0 28px rgba(56, 216, 255, 0.24);
+}
+
+.render-orbit::after {
+  position: absolute;
+  inset: 7px;
+  border-radius: inherit;
+  background: #08091a;
+  content: "";
+}
+
+.render-orbit span {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #e7fbff;
+  box-shadow: 0 0 16px rgba(56, 216, 255, 0.9);
+  transform: translateX(-50%);
+}
+
+.render-progress {
+  background: linear-gradient(90deg, #38d8ff, #5f7cff);
+  box-shadow: 0 0 18px rgba(56, 216, 255, 0.38);
+  transition: width 420ms ease;
+}
+
+.render-equalizer {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  align-items: end;
+  gap: 4px;
+  height: 38px;
+  padding-inline: 0.25rem;
+}
+
+.render-equalizer span {
+  display: block;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(56, 216, 255, 0.92), rgba(95, 124, 255, 0.28));
+  box-shadow: 0 0 14px rgba(56, 216, 255, 0.2);
+  transform-origin: bottom;
+  animation: render-eq 950ms ease-in-out infinite;
+}
+
+.render-equalizer span:nth-child(3n) {
+  animation-delay: 120ms;
+}
+
+.render-equalizer span:nth-child(3n + 1) {
+  animation-delay: 280ms;
+}
+
+.render-equalizer span:nth-child(4n) {
+  animation-duration: 1.2s;
+}
+
+@keyframes render-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes render-scan {
+  0% {
+    transform: translateX(-100%);
+  }
+  55%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes render-eq {
+  0%,
+  100% {
+    transform: scaleY(0.32);
+    opacity: 0.42;
+  }
+  45% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}

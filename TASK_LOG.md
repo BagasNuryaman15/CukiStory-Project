@@ -99,3 +99,27 @@ Catatan ini dipakai sebagai laporan kerja ringan setiap selesai revisi. Formatny
 ### Notes
 
 - Tidak menambahkan AI API, login/register, Supabase, cloud storage, payment, timeline editor kompleks, atau upload YouTube/TikTok.
+
+### Transition and subtitle cleanup
+
+- Mengubah transisi scene menjadi outgoing-only: transition pada scene sekarang hanya berlaku saat scene itu keluar menuju scene berikutnya.
+- Menonaktifkan kontrol transition pada scene terakhir karena tidak punya target scene berikutnya.
+- Mengecilkan skala subtitle default agar lower-third terasa lebih aman untuk video 9:16.
+- Menambahkan subtitle style `Story Caption` untuk caption capitalized yang lebih kecil dan lebih cocok untuk narasi.
+
+### SRT visual timing separation
+
+- Memisahkan timing visual image dari timing subtitle SRT: subtitle tetap mengikuti SRT global, sementara image scene disusun berurutan.
+- `Hold image after cue` sekarang benar-benar menunda image scene berikutnya, sehingga hold tidak lagi tertutup oleh scene berikutnya.
+- Mengubah default image start offset dan hold image after cue menjadi 0s untuk project/scene baru.
+- Mengganti label `Visual start offset` menjadi `Image start offset` dan `End hold` menjadi `Hold image after cue`.
+- Menambahkan indikator jika sebuah scene menunggu karena scene sebelumnya sedang hold.
+
+### Render feedback polish
+
+- Menambahkan render activity panel dengan animated orbit, scanline, estimated progress bar, elapsed time, estimate, dan output target.
+- Mengubah tombol render menjadi status `Rendering MP4...` saat proses berjalan.
+- Menjelaskan bahwa progress render masih estimasi sampai Remotion selesai membuat MP4.
+- Mengubah render activity menjadi modal overlay di tengah layar agar proses export terasa lebih jelas dan fokus.
+- Memindahkan modal render ke `document.body` lewat React portal supaya benar-benar center viewport dan tidak terkunci di card preview.
+- Menambahkan cyberpunk grid overlay, corner brackets, dan equalizer animation pada render modal.

@@ -1,19 +1,20 @@
 import {AbsoluteFill, Audio, Sequence} from "remotion";
 import type {CukiProject} from "../lib/types";
 import {getTotalSceneDuration} from "../lib/timing";
-import {getSceneSrtTiming, getSrtDuration} from "../lib/srt";
+import {getSceneVisualTimings, getSrtDuration} from "../lib/srt";
 import {Scene} from "./Scene";
 import {SrtSubtitleTrack} from "./Subtitle";
 
 export function CukiStoryComposition({project}: {project: CukiProject}) {
   let currentFrame = 0;
   const isSrtMode = project.audioMode === "fullVoSrt" && Boolean(project.srtCues?.length);
+  const visualTimings = isSrtMode ? getSceneVisualTimings(project.scenes, project.srtCues) : [];
 
   return (
     <AbsoluteFill style={{backgroundColor: "#050611"}}>
       {project.audioUrl ? <Audio src={project.audioUrl} /> : null}
       {project.scenes.map((scene, index) => {
-        const srtTiming = isSrtMode ? getSceneSrtTiming(scene, project.srtCues) : null;
+        const srtTiming = isSrtMode ? visualTimings[index] : null;
         const durationInFrames = Math.max(1, Math.round((srtTiming?.duration ?? scene.duration) * project.fps));
         const from = srtTiming ? Math.round(srtTiming.start * project.fps) : currentFrame;
         currentFrame = Math.max(currentFrame, from + durationInFrames);
@@ -22,7 +23,7 @@ export function CukiStoryComposition({project}: {project: CukiProject}) {
             <Scene
               scene={scene}
               durationInFrames={durationInFrames}
-              isFirst={index === 0}
+              hasNextScene={index < project.scenes.length - 1}
               effectSpeed={project.effectSpeed ?? "normal"}
               transitionDuration={scene.transitionDuration ?? project.transitionDuration ?? 0.25}
               subtitleMode={project.subtitleMode ?? "full"}
@@ -53,7 +54,8 @@ export function CukiStoryComposition({project}: {project: CukiProject}) {
 
 export function getProjectDurationInFrames(project: CukiProject) {
   if (project.audioMode === "fullVoSrt") {
-    const mappedSceneEnd = Math.max(0, ...project.scenes.map((scene) => getSceneSrtTiming(scene, project.srtCues)?.end ?? 0));
+    const visualTimings = getSceneVisualTimings(project.scenes, project.srtCues);
+    const mappedSceneEnd = Math.max(0, ...visualTimings.map((timing) => timing?.end ?? 0));
     const duration = Math.max(project.audioDuration ?? 0, getSrtDuration(project.srtCues), mappedSceneEnd, getTotalSceneDuration(project.scenes));
     return Math.max(1, Math.ceil(duration * project.fps));
   }

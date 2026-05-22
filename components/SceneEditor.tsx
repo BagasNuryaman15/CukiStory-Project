@@ -2,7 +2,7 @@
 
 import type {AudioMode, CukiScene, ImageEffect, SrtCue, SubtitleStyle, TransitionType} from "@/lib/types";
 import {createScene} from "@/lib/storage";
-import {autoMapSrtToScenes} from "@/lib/srt";
+import {autoMapSrtToScenes, getSceneVisualTimings} from "@/lib/srt";
 import {createId, reorderScenes} from "@/lib/utils";
 import {SceneCard} from "./SceneCard";
 
@@ -23,6 +23,8 @@ export function SceneEditor({
   audioMode?: AudioMode;
   srtCues?: SrtCue[];
 }) {
+  const visualTimings = audioMode === "fullVoSrt" ? getSceneVisualTimings(scenes, srtCues) : [];
+
   function addScene() {
     onChange([...scenes, createScene(scenes.length + 1, sceneDefaults)]);
   }
@@ -110,6 +112,7 @@ export function SceneEditor({
               onMoveDown={() => moveScene(index, 1)}
               audioMode={audioMode}
               srtCues={srtCues}
+              visualTiming={visualTimings[index]}
             />
           ))}
         </div>

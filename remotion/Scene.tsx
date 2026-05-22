@@ -7,7 +7,7 @@ import {getTransitionOverlay, getTransitionStyle} from "./transitions";
 export function Scene({
   scene,
   durationInFrames,
-  isFirst,
+  hasNextScene,
   effectSpeed,
   transitionDuration,
   subtitleMode,
@@ -17,7 +17,7 @@ export function Scene({
 }: {
   scene: CukiScene;
   durationInFrames: number;
-  isFirst: boolean;
+  hasNextScene: boolean;
   effectSpeed: MotionSpeed;
   transitionDuration: number;
   subtitleMode: SubtitleMode;
@@ -29,8 +29,8 @@ export function Scene({
   const {fps} = useVideoConfig();
   const transitionFrames = Math.max(1, Math.round(transitionDuration * fps));
   const effectStyle = getImageEffectStyle(scene.effect, frame, durationInFrames, fps, effectSpeed);
-  const transitionStyle = getTransitionStyle(scene.transition, frame, durationInFrames, isFirst, transitionFrames);
-  const overlay = getTransitionOverlay(scene.transition, frame, durationInFrames, isFirst, transitionFrames);
+  const transitionStyle = getTransitionStyle(scene.transition, frame, durationInFrames, hasNextScene, transitionFrames);
+  const overlay = getTransitionOverlay(scene.transition, frame, durationInFrames, hasNextScene, transitionFrames);
 
   return (
     <AbsoluteFill style={{backgroundColor: "#050611", overflow: "hidden", ...transitionStyle}}>

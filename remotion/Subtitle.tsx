@@ -87,10 +87,10 @@ function SubtitleVisual({
   frame: number;
 }) {
   const pop = interpolate(Math.min(frame, 12), [0, 8, 12], [0.92, 1.06, 1]);
-  const visibleText = visible.text;
+  const visibleText = formatSubtitleText(visible.text, stylePreset);
   const fontScale = getSubtitleScale(visibleText, mode, size);
   if (!visibleText) return null;
-  const karaokeWords = mode === "karaoke" ? visible.words : undefined;
+  const karaokeWords = mode === "karaoke" ? visible.words?.map((word) => formatSubtitleText(word, stylePreset)) : undefined;
 
   const container: React.CSSProperties = {
     position: "absolute",
@@ -183,9 +183,9 @@ function getVisibleSubtitle(text: string, mode: SubtitleMode, frame: number, dur
 
 function getSubtitleScale(text: string, mode: SubtitleMode, size: SubtitleSize) {
   const sizeScale = {
-    small: 0.88,
-    normal: 1,
-    large: 1.12,
+    small: 0.72,
+    normal: 0.86,
+    large: 1,
   }[size];
 
   if (mode === "wordByWord") {
@@ -218,6 +218,13 @@ function scaled(size: number, scale: number) {
   return Math.round(size * scale);
 }
 
+function formatSubtitleText(text: string, stylePreset: SubtitleStyle) {
+  if (stylePreset !== "storyCaption") return text;
+  return text
+    .toLowerCase()
+    .replace(/(^|[\s"'([{])(\p{L})/gu, (_, prefix: string, letter: string) => `${prefix}${letter.toUpperCase()}`);
+}
+
 function subtitleStyle(stylePreset: SubtitleStyle, mode: SubtitleMode, pop: number, fontScale: number): React.CSSProperties {
   const size = (full: number, word: number) => scaled(mode === "wordByWord" ? word : full, fontScale);
 
@@ -230,6 +237,17 @@ function subtitleStyle(stylePreset: SubtitleStyle, mode: SubtitleMode, pop: numb
         paintOrder: "stroke fill",
         textShadow: "0 12px 0 rgba(0,0,0,0.55), 0 22px 45px rgba(0,0,0,0.8)",
         textTransform: "uppercase",
+      };
+    case "storyCaption":
+      return {
+        color: "white",
+        fontSize: size(50, 72),
+        fontWeight: 800,
+        lineHeight: 1.18,
+        WebkitTextStroke: `${Math.max(2, scaled(mode === "wordByWord" ? 4 : 3, fontScale))}px rgba(0,0,0,0.9)`,
+        paintOrder: "stroke fill",
+        textShadow: "0 8px 24px rgba(0,0,0,0.78)",
+        textTransform: "capitalize",
       };
     case "yellowViralCaption":
       return {
@@ -291,7 +309,7 @@ function subtitleStyle(stylePreset: SubtitleStyle, mode: SubtitleMode, pop: numb
     default:
       return {
         color: "white",
-        fontSize: size(62, 88),
+        fontSize: size(56, 78),
         fontWeight: 800,
         textShadow: "0 8px 28px rgba(0,0,0,0.85)",
       };
@@ -300,6 +318,7 @@ function subtitleStyle(stylePreset: SubtitleStyle, mode: SubtitleMode, pop: numb
 
 function karaokeActiveStyle(stylePreset: SubtitleStyle): React.CSSProperties {
   if (stylePreset === "comicBubble") return {color: "#e11d48"};
+  if (stylePreset === "storyCaption" || stylePreset === "cleanShorts") return {color: "#7dd3fc"};
   if (stylePreset === "yellowViralCaption") return {color: "white"};
   return {color: "#ffd51d"};
 }

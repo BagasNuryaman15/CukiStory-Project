@@ -25,6 +25,7 @@ export type TransitionType =
 
 export type SubtitleStyle =
   | "cukiBoldMeme"
+  | "storyCaption"
   | "yellowViralCaption"
   | "darkComicCaption"
   | "cinematicWhiteStroke"

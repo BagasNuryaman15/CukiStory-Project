@@ -2,6 +2,7 @@ import type {ImageEffect, MotionSpeed, SubtitleMode, SubtitlePosition, SubtitleS
 
 export const subtitleStyles: Array<{value: SubtitleStyle; label: string; description: string}> = [
   {value: "cukiBoldMeme", label: "Cuki Bold Meme", description: "Big white text, thick outline, comedy punch."},
+  {value: "storyCaption", label: "Story Caption", description: "Smaller capitalized caption for narrative videos."},
   {value: "yellowViralCaption", label: "Yellow Viral Caption", description: "Bold yellow Shorts/TikTok caption."},
   {value: "darkComicCaption", label: "Dark Comic Caption", description: "White text in a translucent story box."},
   {value: "cinematicWhiteStroke", label: "Cinematic White Stroke", description: "Clean dramatic text with thin stroke."},
@@ -78,6 +79,14 @@ export const templates: TemplatePreset[] = [
     subtitleStyle: "cukiBoldMeme",
     effects: ["slowZoomIn", "punchZoom", "subtleShake", "breathingZoom"],
     transitions: ["hardCut", "flashCut", "zoomPop"],
+  },
+  {
+    id: "storyNarration",
+    name: "Story Narration",
+    description: "Readable capitalized captions with calm panel motion.",
+    subtitleStyle: "storyCaption",
+    effects: ["slowZoomOut", "panLeft", "panRight", "slowZoomIn"],
+    transitions: ["hardCut", "fade"],
   },
   {
     id: "darkComicStory",
