@@ -26,6 +26,59 @@ export function getProjectTimelineDuration(project: Pick<CukiProject, "audioMode
   return getTotalSceneDuration(project.scenes);
 }
 
+export type ScenePlaybackTiming = {
+  scene: CukiScene;
+  index: number;
+  start: number;
+  end: number;
+  duration: number;
+  source: "srt" | "sequential";
+};
+
+export function getScenePlaybackTimings(project: Pick<CukiProject, "audioMode" | "audioDuration" | "srtCues" | "scenes">): ScenePlaybackTiming[] {
+  const finalDuration = getProjectTimelineDuration(project);
+  const isSrtMode = project.audioMode === "fullVoSrt" && Boolean(project.srtCues?.length);
+
+  if (isSrtMode) {
+    const visualTimings = getSceneVisualTimings(project.scenes, project.srtCues);
+    let fallbackCurrent = 0;
+    return project.scenes.map((scene, index) => {
+      const timing = visualTimings[index];
+      const start = timing?.start ?? fallbackCurrent;
+      const baseEnd = timing?.end ?? start + Math.max(0.1, Number.isFinite(scene.duration) ? scene.duration : 0.1);
+      const isLastScene = index === project.scenes.length - 1;
+      const end = isLastScene ? Math.max(baseEnd, finalDuration) : baseEnd;
+      fallbackCurrent = Math.max(fallbackCurrent, end);
+      return {
+        scene,
+        index,
+        start,
+        end,
+        duration: Math.max(0.1, end - start),
+        source: "srt",
+      };
+    });
+  }
+
+  let current = 0;
+  return project.scenes.map((scene, index) => {
+    const duration = Math.max(0.1, Number.isFinite(scene.duration) ? scene.duration : 0.1);
+    const start = current;
+    const baseEnd = start + duration;
+    const isLastScene = index === project.scenes.length - 1;
+    const end = isLastScene ? Math.max(baseEnd, finalDuration) : baseEnd;
+    current = end;
+    return {
+      scene,
+      index,
+      start,
+      end,
+      duration: Math.max(0.1, end - start),
+      source: "sequential",
+    };
+  });
+}
+
 export function getDurationDifference(project: Pick<CukiProject, "scenes" | "audioDuration">) {
   return getTotalSceneDuration(project.scenes) - (project.audioDuration ?? 0);
 }

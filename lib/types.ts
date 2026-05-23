@@ -46,6 +46,8 @@ export type TimingSource = "estimated" | "synced" | "manual";
 
 export type AudioMode = "fullVoEstimated" | "fullVoSrt" | "sceneAudio";
 
+export type SceneStatus = "empty" | "mapped" | "image_missing" | "ready";
+
 export type SrtCue = {
   id: string;
   index: number;
@@ -54,14 +56,29 @@ export type SrtCue = {
   text: string;
 };
 
+export type SrtValidationIssue = {
+  message: string;
+  cueId?: string;
+};
+
+export type SrtValidationResult = {
+  isValid: boolean;
+  errors: SrtValidationIssue[];
+  warnings: SrtValidationIssue[];
+};
+
 export type CukiScene = {
   id: string;
   order: number;
+  title?: string;
   imageUrl: string | null;
   subtitle: string;
   duration: number;
   timingSource?: TimingSource;
   note?: string;
+  visualNotes?: string;
+  sfxNotes?: string;
+  status?: SceneStatus;
   srtCueStartId?: string | null;
   srtCueEndId?: string | null;
   srtCueStartIndex?: number | null;
@@ -78,6 +95,12 @@ export type CukiScene = {
 export type CukiProject = {
   id: string;
   title: string;
+  hook: string;
+  tagline: string;
+  finalVO: string;
+  youtubeDescription: string;
+  hashtags: string;
+  notes: string;
   aspectRatio: "9:16";
   fps: 30;
   width: 1080;
@@ -85,6 +108,7 @@ export type CukiProject = {
   audioMode: AudioMode;
   audioUrl: string | null;
   audioDuration: number | null;
+  srtRaw?: string;
   srtCues?: SrtCue[];
   srtFileName?: string | null;
   globalSubtitleStyle: SubtitleStyle;

@@ -151,3 +151,35 @@ Catatan ini dipakai sebagai laporan kerja ringan setiap selesai revisi. Formatny
 - Menambahkan unit test untuk parser SRT timestamp koma/titik, sort cue, stable cue id, duplicate SRT index, auto map, dan visual hold timing.
 - Menambahkan unit test durasi timeline agar mode SRT tidak tertarik oleh `scene.duration` stale.
 - Memindahkan render validation ke helper murni dan menambahkan test untuk blocking errors serta project SRT lengkap.
+
+## 2026-05-23
+
+### Production cockpit workflow
+
+- Menambahkan Story Package untuk title, hook, tagline, final VO, YouTube description, hashtags, dan notes.
+- Mengubah default project baru ke mode Full VO + SRT agar sesuai workflow utama.
+- Menyimpan raw SRT untuk backup/export pack.
+- Menambahkan SRT validation untuk cue kosong, timestamp invalid, overlap, urutan cue, dan gap warning.
+- Mengubah render readiness menjadi checklist terstruktur yang dipakai UI dan API render.
+
+### Scene timeline and preview sync
+
+- Menambahkan scene title, visual notes, SFX notes, dan status scene.
+- Menambahkan status scene: empty, mapped, image missing, dan ready.
+- Menambahkan VO segment dari mapped SRT cues di Scene Timeline.
+- Menambahkan tombol Add Scene di bawah timeline agar tidak perlu scroll balik saat scene sudah banyak.
+- Memindahkan playback timing ke helper bersama agar preview dan Remotion render memakai source of truth yang sama.
+- Menahan visual scene terakhir sampai final duration untuk mengurangi black tail kosong.
+- Menambahkan Preview Sync panel dengan status audio, subtitle, mapping, image, duration, dan scene timing.
+
+### Dashboard and export
+
+- Merombak dashboard menjadi cyberpunk production cockpit dengan framed hero stage, visual center panel, launch module, dan project nodes.
+- Menambahkan Export Project Pack dari Render panel.
+- Export pack berisi final VO, YouTube metadata, scene timeline markdown, project JSON, dan SRT backup jika tersedia.
+- Project JSON export menghapus data URL image/audio besar dan menggantinya dengan placeholder session-only agar backup tetap ringan.
+
+### Verification
+
+- `npm test` berhasil dengan 15 test.
+- `npm run build` berhasil.

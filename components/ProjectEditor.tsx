@@ -4,6 +4,7 @@ import Link from "next/link";
 import {useEffect, useState} from "react";
 import {RenderPanel} from "./RenderPanel";
 import {SceneEditor} from "./SceneEditor";
+import {StoryPackagePanel} from "./StoryPackagePanel";
 import {StyleControls} from "./StyleControls";
 import {VideoPreview} from "./VideoPreview";
 import {VoiceSrtPanel} from "./VoiceSrtPanel";
@@ -11,7 +12,7 @@ import type {CukiProject} from "@/lib/types";
 import {autoDistributeDurations, normalizeDurations} from "@/lib/timing";
 import {getProject, saveProject} from "@/lib/storage";
 import {templates} from "@/lib/presets";
-import {getAssignedSrtCueIds, getSceneSrtTiming} from "@/lib/srt";
+import {validateForRender} from "@/lib/renderValidation";
 import {reorderScenes} from "@/lib/utils";
 
 export function ProjectEditor({projectId}: {projectId: string}) {
@@ -19,7 +20,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
   const [saveStatus, setSaveStatus] = useState("Loading...");
   const [storageError, setStorageError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [activeStep, setActiveStep] = useState<EditorStep>("scenes");
+  const [activeStep, setActiveStep] = useState<EditorStep>("story");
 
   useEffect(() => {
     const loaded = getProject(projectId);
@@ -136,12 +137,23 @@ export function ProjectEditor({projectId}: {projectId: string}) {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>
-          {activeStep === "scenes" ? (
+          {activeStep === "story" ? (
             <StepShell
               eyebrow="Step 1"
-              title="Build Scenes"
-              description="Start with panels and captions. Keep timing rough here; VO sync comes next."
-              footer={<StepFooter nextLabel="Next: Voice Over" onNext={() => setActiveStep("voice")} />}
+              title="Story Package"
+              description="Keep the production text in one place: hook, final VO, upload copy, and notes."
+              footer={<StepFooter nextLabel="Next: Audio & SRT" onNext={() => setActiveStep("voice")} />}
+            >
+              <StoryPackagePanel project={project} onChange={update} />
+            </StepShell>
+          ) : null}
+
+          {activeStep === "scenes" ? (
+            <StepShell
+              eyebrow="Step 3"
+              title="Scene Timeline"
+              description="Map SRT cue ranges to visual scenes, upload images, and tune image timing."
+              footer={<StepFooter previousLabel="Back: Audio & SRT" nextLabel="Next: Style" onPrevious={() => setActiveStep("voice")} onNext={() => setActiveStep("style")} />}
             >
               <SceneEditor
                 scenes={project.scenes}
@@ -156,9 +168,9 @@ export function ProjectEditor({projectId}: {projectId: string}) {
           {activeStep === "voice" ? (
             <StepShell
               eyebrow="Step 2"
-              title="Voice & SRT Timing"
-              description="Upload narration and SRT timing. SRT drives subtitle timing while CukiStory keeps visual style control."
-              footer={<StepFooter previousLabel="Back: Scenes" nextLabel="Next: Style" onPrevious={() => setActiveStep("scenes")} onNext={() => setActiveStep("style")} />}
+              title="Audio & SRT Manager"
+              description="Upload final VO and SRT timing. SRT drives subtitle timing while CukiStory controls visual style."
+              footer={<StepFooter previousLabel="Back: Story" nextLabel="Next: Scene Timeline" onPrevious={() => setActiveStep("story")} onNext={() => setActiveStep("scenes")} />}
             >
               <div className="space-y-5">
                 <VoiceSrtPanel project={project} onChange={update} />
@@ -188,10 +200,10 @@ export function ProjectEditor({projectId}: {projectId: string}) {
 
           {activeStep === "style" ? (
             <StepShell
-              eyebrow="Step 3"
+              eyebrow="Step 4"
               title="Style"
               description="Choose the global caption look, transition behavior, motion speed, and subtitle reveal mode."
-              footer={<StepFooter previousLabel="Back: Voice Over" nextLabel="Next: Preview" onPrevious={() => setActiveStep("voice")} onNext={() => setActiveStep("preview")} />}
+              footer={<StepFooter previousLabel="Back: Scene Timeline" nextLabel="Next: Preview" onPrevious={() => setActiveStep("scenes")} onNext={() => setActiveStep("preview")} />}
             >
               <StyleControls project={project} onChange={update} onApplyTemplate={applyTemplate} />
             </StepShell>
@@ -199,7 +211,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
 
           {activeStep === "preview" ? (
             <StepShell
-              eyebrow="Step 4"
+              eyebrow="Step 5"
               title="Preview & Render"
               description="Review the final video, check export guidance, then render the MP4."
               footer={<StepFooter previousLabel="Back: Style" onPrevious={() => setActiveStep("style")} />}
@@ -210,11 +222,17 @@ export function ProjectEditor({projectId}: {projectId: string}) {
         </div>
 
         <aside className="space-y-6 xl:sticky xl:top-28 xl:self-start">
-          <VideoPreview project={project} />
-          {activeStep === "preview" ? (
-            <RenderPanel project={project} onSave={forceSave} />
+          {activeStep === "story" ? (
+            <StoryPackageAside project={project} onNext={() => setActiveStep("voice")} />
           ) : (
-            <ActiveStepHint activeStep={activeStep} onPreview={() => setActiveStep("preview")} />
+            <>
+              <VideoPreview project={project} />
+              {activeStep === "preview" ? (
+                <RenderPanel project={project} onSave={forceSave} />
+              ) : (
+                <ActiveStepHint activeStep={activeStep} onPreview={() => setActiveStep("preview")} />
+              )}
+            </>
           )}
         </aside>
       </div>
@@ -222,18 +240,19 @@ export function ProjectEditor({projectId}: {projectId: string}) {
   );
 }
 
-type EditorStep = "scenes" | "voice" | "style" | "preview";
+type EditorStep = "story" | "voice" | "scenes" | "style" | "preview";
 
 const steps: Array<{id: EditorStep; label: string; description: string}> = [
-  {id: "scenes", label: "Scenes", description: "Panels and captions"},
-  {id: "voice", label: "Voice & SRT", description: "Audio and subtitle timing"},
+  {id: "story", label: "Story", description: "VO and metadata"},
+  {id: "voice", label: "Audio & SRT", description: "Timing source"},
+  {id: "scenes", label: "Timeline", description: "Cue to image mapping"},
   {id: "style", label: "Style", description: "Captions and motion"},
   {id: "preview", label: "Preview & Render", description: "Export MP4"},
 ];
 
 function StepNav({activeStep, project, onChange}: {activeStep: EditorStep; project: CukiProject; onChange: (step: EditorStep) => void}) {
   return (
-    <nav className="mb-5 grid gap-3 lg:grid-cols-4">
+    <nav className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
       {steps.map((step, index) => {
         const active = activeStep === step.id;
         return (
@@ -259,6 +278,7 @@ function StepNav({activeStep, project, onChange}: {activeStep: EditorStep; proje
 
 function StepStatus({step, project}: {step: EditorStep; project: CukiProject}) {
   const ready = {
+    story: Boolean(project.finalVO.trim() || (project.title.trim() && project.hook.trim())),
     scenes: project.scenes.length > 0,
     voice: project.audioMode === "fullVoSrt" ? Boolean(project.audioDuration && project.srtCues?.length) : Boolean(project.audioDuration),
     style: true,
@@ -319,7 +339,8 @@ function StepFooter({
 
 function ActiveStepHint({activeStep, onPreview}: {activeStep: EditorStep; onPreview: () => void}) {
   const text = {
-    scenes: "Build your panels first. Preview updates live as soon as scenes are added.",
+    story: "Start with the final script package so timing, scenes, and export metadata all point to the same source.",
+    scenes: "Map cue ranges to scenes, add images, and use the preview to catch sync issues early.",
     voice: "Upload VO and SRT timing. The preview stays available while timing changes.",
     style: "Style choices apply to the preview immediately.",
     preview: "Ready for final review.",
@@ -336,34 +357,57 @@ function ActiveStepHint({activeStep, onPreview}: {activeStep: EditorStep; onPrev
   );
 }
 
-function FinalChecklist({project}: {project: CukiProject}) {
-  const srtCues = project.srtCues ?? [];
-  const assignedCueIds = getAssignedSrtCueIds(project.scenes, srtCues);
-  const assignedCueCount = srtCues.filter((cue) => assignedCueIds.has(cue.id)).length;
-  const mappedSceneCount = project.scenes.filter((scene) => getSceneSrtTiming(scene, srtCues)).length;
-  const subtitleModeLabel = {
-    full: "Full subtitle chunks enabled",
-    wordByWord: "Word-by-word subtitles enabled",
-    karaoke: "Karaoke subtitles enabled",
-  }[project.subtitleMode];
+function StoryPackageAside({project, onNext}: {project: CukiProject; onNext: () => void}) {
+  const finalVoWords = project.finalVO.trim().split(/\s+/).filter(Boolean).length;
   const items = [
-    {label: `${project.scenes.length} scene${project.scenes.length === 1 ? "" : "s"} added`, ready: project.scenes.length > 0},
-    {label: project.audioDuration ? "Voice over loaded" : "Voice over still needed", ready: Boolean(project.audioDuration)},
-    {label: project.audioMode === "fullVoSrt" ? `${project.srtCues?.length ?? 0} SRT cues parsed` : "Estimated timing fallback", ready: project.audioMode !== "fullVoSrt" || Boolean(project.srtCues?.length)},
-    ...(project.audioMode === "fullVoSrt" ? [
-      {label: `${mappedSceneCount}/${project.scenes.length} scenes mapped to SRT`, ready: project.scenes.length > 0 && mappedSceneCount === project.scenes.length},
-      {label: `${assignedCueCount}/${srtCues.length} SRT cues assigned`, ready: srtCues.length > 0 && assignedCueCount === srtCues.length},
-    ] : []),
-    {label: "Global style selected", ready: true},
-    {label: subtitleModeLabel, ready: true},
+    {label: "Title", ready: Boolean(project.title.trim())},
+    {label: "Hook", ready: Boolean(project.hook.trim())},
+    {label: "Final VO", ready: finalVoWords > 0},
+    {label: "Upload copy", ready: Boolean(project.youtubeDescription.trim()), optional: true},
   ];
 
   return (
+    <section className="glass-card rounded-[1.5rem] p-5">
+      <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-studio-cyan">Story Control</p>
+      <h2 className="mt-2 text-2xl font-extrabold text-white">Package Status</h2>
+      <p className="mt-2 text-sm leading-6 text-studio-muted">
+        Prepare the script and upload copy first. Preview becomes useful after audio, SRT, and scenes exist.
+      </p>
+
+      <div className="mt-5 space-y-2">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-3">
+            <span className="text-sm font-extrabold text-white">{item.label}</span>
+            <span className={`rounded-full px-2.5 py-1 text-[0.68rem] font-extrabold ${item.ready ? "bg-emerald-400/15 text-emerald-200" : "bg-white/10 text-studio-muted"}`}>
+              {item.ready ? "Ready" : item.optional ? "Optional" : "Setup"}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-studio-cyan/20 bg-studio-cyan/10 p-4">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-studio-muted">Next step</p>
+        <p className="mt-2 text-sm font-bold leading-6 text-cyan-100">
+          Upload the final VO and SRT timing. Step 3 Timeline is where cue ranges become visual scenes.
+        </p>
+      </div>
+
+      <button onClick={onNext} className="btn-primary mt-5 w-full px-4 py-3 text-sm">
+        Continue to Audio & SRT
+      </button>
+    </section>
+  );
+}
+
+function FinalChecklist({project}: {project: CukiProject}) {
+  const validation = validateForRender(project);
+
+  return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {items.map((item) => (
-        <div key={item.label} className={`rounded-2xl border p-4 ${item.ready ? "border-emerald-400/20 bg-emerald-400/10" : "border-studio-cyan/20 bg-studio-cyan/10"}`}>
+      {validation.checklist.map((item) => (
+        <div key={item.id} className={`rounded-2xl border p-4 ${item.ready ? "border-emerald-400/20 bg-emerald-400/10" : item.required ? "border-red-400/30 bg-red-500/10" : "border-studio-cyan/20 bg-studio-cyan/10"}`}>
           <p className="text-sm font-extrabold text-white">{item.label}</p>
-          <p className="mt-1 text-xs text-studio-muted">{item.ready ? "Ready" : "Finish this before the cleanest render"}</p>
+          <p className="mt-1 text-xs text-studio-muted">{item.ready ? "Ready" : item.message}</p>
         </div>
       ))}
     </div>

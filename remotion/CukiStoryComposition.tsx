@@ -1,23 +1,19 @@
 import {AbsoluteFill, Audio, Sequence} from "remotion";
 import type {CukiProject} from "../lib/types";
-import {getProjectTimelineDuration} from "../lib/timing";
-import {getSceneVisualTimings} from "../lib/srt";
+import {getProjectTimelineDuration, getScenePlaybackTimings} from "../lib/timing";
 import {Scene} from "./Scene";
 import {SrtSubtitleTrack} from "./Subtitle";
 
 export function CukiStoryComposition({project}: {project: CukiProject}) {
-  let currentFrame = 0;
   const isSrtMode = project.audioMode === "fullVoSrt" && Boolean(project.srtCues?.length);
-  const visualTimings = isSrtMode ? getSceneVisualTimings(project.scenes, project.srtCues) : [];
+  const playbackTimings = getScenePlaybackTimings(project);
 
   return (
     <AbsoluteFill style={{backgroundColor: "#050611"}}>
       {project.audioUrl ? <Audio src={project.audioUrl} /> : null}
-      {project.scenes.map((scene, index) => {
-        const srtTiming = isSrtMode ? visualTimings[index] : null;
-        const durationInFrames = Math.max(1, Math.round((srtTiming?.duration ?? scene.duration) * project.fps));
-        const from = srtTiming ? Math.round(srtTiming.start * project.fps) : currentFrame;
-        currentFrame = Math.max(currentFrame, from + durationInFrames);
+      {playbackTimings.map(({scene, index, start, duration}) => {
+        const durationInFrames = Math.max(1, Math.round(duration * project.fps));
+        const from = Math.round(start * project.fps);
         return (
           <Sequence key={scene.id} from={from} durationInFrames={durationInFrames}>
             <Scene

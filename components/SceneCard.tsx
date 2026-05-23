@@ -3,7 +3,7 @@
 import {useEffect, useState} from "react";
 import type {AudioMode, CukiScene, SrtCue} from "@/lib/types";
 import {transitionDurations} from "@/lib/presets";
-import {formatShortTimestamp, getSceneSrtCueRange, getSceneSrtCues, getSceneSrtTiming} from "@/lib/srt";
+import {formatShortTimestamp, getSceneSrtCueRange, getSceneSrtCues, getSceneSrtTiming, getSceneStatus, getSceneVoSegment} from "@/lib/srt";
 import type {SceneVisualTiming} from "@/lib/srt";
 import {fileToDataUrl, formatSeconds} from "@/lib/utils";
 import {EffectPicker} from "./EffectPicker";
@@ -34,6 +34,8 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
   const effectiveDuration = srtTiming?.duration ?? scene.duration;
   const shiftedByPrevious = getShiftedByPrevious(srtTiming);
   const warnings = getSceneWarnings(scene, isSrtMode, mappedCues.length > 0);
+  const sceneStatus = getSceneStatus(scene, srtCues, isSrtMode);
+  const voSegment = isSrtMode ? getSceneVoSegment(scene, srtCues) : scene.subtitle;
 
   async function handleImage(file: File | undefined) {
     if (!file) return;
@@ -73,12 +75,25 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
 
   return (
     <article className="glass-card rounded-[1.5rem] p-5">
+      <div className="mb-4 flex flex-col gap-3 border-b border-white/10 pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-studio-cyan/20 bg-studio-cyan/10 text-sm font-black text-studio-cyan">
+            {index + 1}
+          </span>
+          <input
+            value={scene.title ?? ""}
+            onChange={(event) => onChange({...scene, title: event.target.value})}
+            className="min-w-0 flex-1 bg-transparent text-xl font-extrabold text-white outline-none placeholder:text-studio-muted"
+            placeholder={`Scene ${index + 1} title`}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <SceneStatusPill status={sceneStatus} />
+          <p className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-bold text-studio-muted">{formatSeconds(effectiveDuration)}</p>
+        </div>
+      </div>
       <div className="flex flex-col gap-4 xl:flex-row">
         <div className="w-full xl:w-56">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-lg font-extrabold text-white">Scene {index + 1}</p>
-            <p className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-bold text-studio-muted">{formatSeconds(effectiveDuration)}</p>
-          </div>
           <label className="group relative flex aspect-[9/16] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/20 bg-gradient-to-br from-white/[0.07] to-white/[0.02]">
             {scene.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -92,6 +107,15 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
             )}
             <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={(event) => handleImage(event.target.files?.[0])} />
           </label>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button onClick={() => onChange({...scene, imageUrl: null})} disabled={!scene.imageUrl} className="btn-quiet px-3 py-2 text-sm">
+              Remove Image
+            </button>
+            <button onClick={() => document.getElementById(`scene-image-${scene.id}`)?.click()} className="btn-secondary px-3 py-2 text-sm">
+              Replace
+            </button>
+          </div>
+          <input id={`scene-image-${scene.id}`} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={(event) => handleImage(event.target.files?.[0])} />
         </div>
 
         <div className="flex-1 space-y-4">
@@ -104,7 +128,7 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
           ) : null}
 
           {isSrtMode ? (
-            <MappedSrtPreview mappedCues={mappedCues} />
+            <MappedSrtPreview mappedCues={mappedCues} voSegment={voSegment} />
           ) : (
             <div>
               <label className="text-xs font-bold uppercase tracking-[0.22em] text-studio-muted">Subtitle</label>
@@ -118,14 +142,25 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
             </div>
           )}
 
-          <div>
-            <label className="text-xs font-bold uppercase tracking-[0.22em] text-studio-muted">Scene Note</label>
-            <input
-              value={scene.note ?? ""}
-              onChange={(event) => onChange({...scene, note: event.target.value})}
-              className="studio-input mt-2 w-full rounded-2xl px-4 py-3"
-              placeholder="Optional creator note for this panel..."
-            />
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Visual Notes">
+              <textarea
+                value={scene.visualNotes ?? scene.note ?? ""}
+                onChange={(event) => onChange({...scene, visualNotes: event.target.value, note: event.target.value})}
+                rows={3}
+                className="studio-input w-full resize-y rounded-xl px-4 py-3 text-sm"
+                placeholder="Visual direction, image prompt backup, regeneration notes..."
+              />
+            </Field>
+            <Field label="SFX Notes">
+              <textarea
+                value={scene.sfxNotes ?? ""}
+                onChange={(event) => onChange({...scene, sfxNotes: event.target.value})}
+                rows={3}
+                className="studio-input w-full resize-y rounded-xl px-4 py-3 text-sm"
+                placeholder="Optional sound effect or finishing notes..."
+              />
+            </Field>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -280,7 +315,7 @@ function getSelectedCueId(cueId: string | null | undefined, cues: SrtCue[], fall
   return fallbackCueId ?? "";
 }
 
-function MappedSrtPreview({mappedCues}: {mappedCues: SrtCue[]}) {
+function MappedSrtPreview({mappedCues, voSegment}: {mappedCues: SrtCue[]; voSegment: string}) {
   return (
     <div className={`rounded-2xl border p-4 ${mappedCues.length > 0 ? "border-studio-cyan/20 bg-studio-cyan/10" : "border-white/10 bg-white/[0.035]"}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -294,7 +329,11 @@ function MappedSrtPreview({mappedCues}: {mappedCues: SrtCue[]}) {
       </div>
 
       {mappedCues.length > 0 ? (
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-3">
+          <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-studio-muted">VO Segment</p>
+            <p className="mt-2 text-sm font-bold leading-6 text-white">{voSegment}</p>
+          </div>
           {mappedCues.map((cue) => (
             <div key={cue.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
               <p className="text-xs font-bold text-cyan-100">
@@ -310,6 +349,21 @@ function MappedSrtPreview({mappedCues}: {mappedCues: SrtCue[]}) {
         </p>
       )}
     </div>
+  );
+}
+
+function SceneStatusPill({status}: {status: ReturnType<typeof getSceneStatus>}) {
+  const config = {
+    empty: {label: "Empty", className: "bg-white/10 text-studio-muted"},
+    mapped: {label: "Mapped", className: "bg-studio-cyan/10 text-cyan-100"},
+    image_missing: {label: "Image Missing", className: "bg-amber-400/15 text-amber-100"},
+    ready: {label: "Ready", className: "bg-emerald-400/15 text-emerald-200"},
+  }[status];
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${config.className}`}>
+      {config.label}
+    </span>
   );
 }
 

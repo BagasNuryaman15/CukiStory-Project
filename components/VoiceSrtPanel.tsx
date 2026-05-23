@@ -2,7 +2,7 @@
 
 import {useRef, useState} from "react";
 import type {AudioMode, CukiProject} from "@/lib/types";
-import {autoMapSrtToScenes, formatShortTimestamp, getAssignedSrtCueIds, getSrtDuration, parseSrt} from "@/lib/srt";
+import {autoMapSrtToScenes, formatShortTimestamp, getAssignedSrtCueIds, getSrtDuration, parseSrt, validateSrtCues} from "@/lib/srt";
 import {formatSeconds, reorderScenes} from "@/lib/utils";
 import {AudioUploader} from "./AudioUploader";
 import {DurationSummary} from "./DurationSummary";
@@ -12,6 +12,7 @@ export function VoiceSrtPanel({project, onChange}: {project: CukiProject; onChan
   const [srtError, setSrtError] = useState<string | null>(null);
   const srtCues = project.srtCues ?? [];
   const srtDuration = getSrtDuration(srtCues);
+  const srtValidation = validateSrtCues(srtCues);
   const assignedCueIds = getAssignedSrtCueIds(project.scenes, srtCues);
   const assignedCueCount = srtCues.filter((cue) => assignedCueIds.has(cue.id)).length;
   const warnings = getVoiceSrtWarnings(project);
@@ -26,11 +27,15 @@ export function VoiceSrtPanel({project, onChange}: {project: CukiProject; onChan
       onChange({
         ...project,
         audioMode: "fullVoSrt",
+        srtRaw: text,
         srtCues: cues,
         srtFileName: file.name,
       });
       if (cues.length === 0) {
         setSrtError("No valid SRT cues were found. Check the exported .srt file and encoding.");
+      } else {
+        const validation = validateSrtCues(cues);
+        if (!validation.isValid) setSrtError(validation.errors[0]?.message ?? "SRT has timing issues.");
       }
     } catch {
       setSrtError("SRT failed to load. Export the subtitle as UTF-8 / Unicode .srt and try again.");
@@ -104,16 +109,39 @@ export function VoiceSrtPanel({project, onChange}: {project: CukiProject; onChan
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <InfoPanel label="SRT File" value={project.srtFileName || "No SRT"} />
           <InfoPanel label="Parsed Cues" value={`${srtCues.length}`} />
-          <InfoPanel label="SRT Range" value={srtCues.length > 0 ? `${formatShortTimestamp(srtCues[0].start)} - ${formatShortTimestamp(srtDuration)}` : "Waiting"} />
+          <InfoPanel label="SRT Status" value={srtCues.length > 0 ? (srtValidation.isValid ? "Valid" : "Needs fix") : "Waiting"} />
         </div>
+        {srtCues.length > 0 ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <InfoPanel label="SRT Range" value={`${formatShortTimestamp(srtCues[0].start)} - ${formatShortTimestamp(srtDuration)}`} />
+            <InfoPanel label="Raw SRT Stored" value={project.srtRaw ? "Yes" : "No"} />
+          </div>
+        ) : null}
 
         {srtError ? <p className="mt-4 text-sm text-red-200">{srtError}</p> : null}
+
+        {srtValidation.errors.length > 0 && srtCues.length > 0 ? (
+          <div className="mt-5 rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-red-100">
+            <p className="font-extrabold">SRT validation</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+              {srtValidation.errors.map((error) => <li key={error.message}>{error.message}</li>)}
+            </ul>
+          </div>
+        ) : null}
 
         {warnings.length > 0 ? (
           <div className="soft-warning mt-5 rounded-2xl p-4">
             <p className="font-extrabold">Timing checks</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
               {warnings.map((warning) => <li key={warning}>{warning}</li>)}
+              {srtValidation.warnings.map((warning) => <li key={warning.message}>{warning.message}</li>)}
+            </ul>
+          </div>
+        ) : srtValidation.warnings.length > 0 ? (
+          <div className="soft-warning mt-5 rounded-2xl p-4">
+            <p className="font-extrabold">Timing checks</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+              {srtValidation.warnings.map((warning) => <li key={warning.message}>{warning.message}</li>)}
             </ul>
           </div>
         ) : null}

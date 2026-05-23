@@ -3,6 +3,7 @@
 import {useEffect, useMemo, useState} from "react";
 import {createPortal} from "react-dom";
 import type {CukiProject} from "@/lib/types";
+import {createProjectExportPack} from "@/lib/exportPack";
 import {getProjectTimelineDuration} from "@/lib/timing";
 import {validateForRender} from "@/lib/renderValidation";
 import {downloadBlob, formatSeconds} from "@/lib/utils";
@@ -56,10 +57,40 @@ export function RenderPanel({project, onSave}: {project: CukiProject; onSave: ()
     }
   }
 
+  function exportPack() {
+    onSave();
+    const files = createProjectExportPack(project);
+    files.forEach((file, index) => {
+      window.setTimeout(() => {
+        downloadBlob(new Blob([file.content], {type: file.type}), file.filename);
+      }, index * 120);
+    });
+    setStatus(`Export pack ready. ${files.length} file${files.length === 1 ? "" : "s"} downloaded.`);
+  }
+
   return (
     <section className="glass-card rounded-[1.5rem] p-5">
       <h2 className="text-2xl font-extrabold text-white">Render MP4</h2>
       <p className="mt-1 text-sm text-studio-muted">Exports a 1080x1920, 30fps MP4 with VO, subtitles, image motion, and transitions.</p>
+
+      <div className="mt-5 grid gap-2">
+        {validation.checklist.map((item) => (
+          <div
+            key={item.id}
+            className={`flex items-start justify-between gap-3 rounded-xl border px-3 py-2 text-sm ${
+              item.ready ? "border-emerald-400/20 bg-emerald-400/10" : item.required ? "border-red-400/30 bg-red-500/10" : "border-studio-cyan/20 bg-studio-cyan/10"
+            }`}
+          >
+            <div>
+              <p className="font-extrabold text-white">{item.label}</p>
+              {!item.ready ? <p className="mt-1 text-xs text-studio-muted">{item.message}</p> : null}
+            </div>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[0.68rem] font-extrabold ${item.ready ? "bg-emerald-400/15 text-emerald-200" : "bg-white/10 text-studio-muted"}`}>
+              {item.ready ? "Ready" : item.required ? "Required" : "Optional"}
+            </span>
+          </div>
+        ))}
+      </div>
 
       {validation.errors.length > 0 ? (
         <div className="mt-5 rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-red-100">
@@ -78,6 +109,18 @@ export function RenderPanel({project, onSave}: {project: CukiProject; onSave: ()
           </ul>
         </div>
       ) : null}
+
+      <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-extrabold text-white">Export Project Pack</p>
+            <p className="mt-1 text-sm text-studio-muted">Download VO, YouTube metadata, scene timeline, project JSON, and SRT backup.</p>
+          </div>
+          <button onClick={exportPack} className="btn-secondary px-4 py-3 text-sm">
+            Export Pack
+          </button>
+        </div>
+      </div>
 
       <button
         onClick={render}

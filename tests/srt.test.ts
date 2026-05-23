@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {autoMapSrtToScenes, getAssignedSrtCueIds, getSceneSrtCues, getSceneVisualTimings, parseSrt} from "../lib/srt";
+import {autoMapSrtToScenes, getAssignedSrtCueIds, getSceneSrtCues, getSceneStatus, getSceneVisualTimings, getSceneVoSegment, parseSrt, validateSrtCues} from "../lib/srt";
 import type {CukiScene} from "../lib/types";
 
 test("parseSrt supports comma and dot timestamps and sorts cues by start time", () => {
@@ -17,6 +17,22 @@ First cue`);
   assert.equal(cues[0].start, 0.5);
   assert.equal(cues[1].end, 3.25);
   assert.match(cues[0].id, /^srt-cue-1-500-1500-/);
+});
+
+test("validateSrtCues blocks overlaps and empty cue lists", () => {
+  assert.equal(validateSrtCues([]).isValid, false);
+
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:02,000
+First
+
+2
+00:00:01,500 --> 00:00:03,000
+Second`);
+  const validation = validateSrtCues(cues);
+
+  assert.equal(validation.isValid, false);
+  assert.match(validation.errors.map((error) => error.message).join("\n"), /overlaps/);
 });
 
 test("id-based mapping does not over-select duplicate SRT file indexes", () => {
@@ -61,6 +77,25 @@ Ending`);
   assert.equal(scenes[0].srtCueStartId, cues[0].id);
   assert.equal(typeof scenes[0].srtCueEndId, "string");
   assert.equal(assigned.size, cues.length);
+});
+
+test("scene status and VO segment are derived from mapped cues and image state", () => {
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:01,000
+Opening
+
+2
+00:00:01,000 --> 00:00:02,000
+Middle`);
+  const scene = makeScene({
+    imageUrl: null,
+    srtCueStartId: cues[0].id,
+    srtCueEndId: cues[1].id,
+  });
+
+  assert.equal(getSceneStatus(scene, cues), "image_missing");
+  assert.equal(getSceneVoSegment(scene, cues), "Opening Middle");
+  assert.equal(getSceneStatus({...scene, imageUrl: "data:image/png;base64,ok"}, cues), "ready");
 });
 
 test("visual timings delay later scenes when previous scene holds", () => {

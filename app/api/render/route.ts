@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import {NextRequest} from "next/server";
 import type {CukiProject} from "@/lib/types";
+import {validateForRender} from "@/lib/renderValidation";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -12,6 +13,10 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {project?: CukiProject};
     if (!body.project) {
       return Response.json({error: "Missing project data."}, {status: 400});
+    }
+    const validation = validateForRender(body.project);
+    if (validation.errors.length > 0) {
+      return Response.json({error: validation.errors[0]}, {status: 400});
     }
 
     const [{bundle}, {renderMedia, selectComposition}] = await Promise.all([

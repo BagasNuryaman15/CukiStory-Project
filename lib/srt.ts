@@ -1,4 +1,4 @@
-import type {CukiScene, SrtCue} from "./types";
+import type {CukiScene, SceneStatus, SrtCue, SrtValidationResult} from "./types";
 
 export type SceneSrtTiming = {
   start: number;
@@ -66,6 +66,43 @@ export function formatShortTimestamp(seconds: number): string {
 export function getSrtDuration(cues: SrtCue[] | undefined) {
   if (!cues || cues.length === 0) return 0;
   return Math.max(...cues.map((cue) => cue.end));
+}
+
+export function validateSrtCues(cues: SrtCue[] | undefined): SrtValidationResult {
+  const errors: SrtValidationResult["errors"] = [];
+  const warnings: SrtValidationResult["warnings"] = [];
+
+  if (!cues || cues.length === 0) {
+    errors.push({message: "SRT has no valid subtitle cues."});
+    return {isValid: false, errors, warnings};
+  }
+
+  cues.forEach((cue, index) => {
+    if (!Number.isFinite(cue.start) || !Number.isFinite(cue.end)) {
+      errors.push({message: `Cue ${cue.index} has an invalid timestamp.`, cueId: cue.id});
+    }
+    if (Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.end <= cue.start) {
+      errors.push({message: `Cue ${cue.index} must end after it starts.`, cueId: cue.id});
+    }
+    if (!cue.text.trim()) {
+      errors.push({message: `Cue ${cue.index} has empty subtitle text.`, cueId: cue.id});
+    }
+
+    const previousCue = cues[index - 1];
+    if (!previousCue) return;
+
+    if (cue.start < previousCue.start) {
+      errors.push({message: `Cue ${cue.index} starts before the previous cue.`, cueId: cue.id});
+    }
+    if (cue.start < previousCue.end) {
+      errors.push({message: `Cue ${previousCue.index} overlaps cue ${cue.index}.`, cueId: cue.id});
+    }
+    if (cue.start - previousCue.end > 2.5) {
+      warnings.push({message: `There is a ${formatShortTimestamp(cue.start - previousCue.end)} gap before cue ${cue.index}.`, cueId: cue.id});
+    }
+  });
+
+  return {isValid: errors.length === 0, errors, warnings};
 }
 
 export function getSceneSrtCueRange(
@@ -159,6 +196,20 @@ export function getAssignedSrtCueIds(scenes: CukiScene[], cues: SrtCue[] | undef
     getSceneSrtCues(scene, cues).forEach((cue) => assigned.add(cue.id));
   });
   return assigned;
+}
+
+export function getSceneStatus(scene: CukiScene, cues: SrtCue[] | undefined, isSrtMode = true): SceneStatus {
+  const hasImage = Boolean(scene.imageUrl);
+  const hasMapping = isSrtMode ? Boolean(getSceneSrtTiming(scene, cues)) : Boolean(scene.subtitle.trim());
+
+  if (!hasMapping && !hasImage) return "empty";
+  if (hasMapping && !hasImage) return "image_missing";
+  if (hasMapping && hasImage) return "ready";
+  return "mapped";
+}
+
+export function getSceneVoSegment(scene: CukiScene, cues: SrtCue[] | undefined) {
+  return getSceneSrtCues(scene, cues).map((cue) => cue.text.trim()).filter(Boolean).join(" ");
 }
 
 export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {

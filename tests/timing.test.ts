@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {getProjectTimelineDuration} from "../lib/timing";
+import {getProjectTimelineDuration, getScenePlaybackTimings} from "../lib/timing";
 import {parseSrt} from "../lib/srt";
 import type {CukiProject, CukiScene} from "../lib/types";
 
@@ -24,6 +24,44 @@ Short cue`);
   assert.equal(getProjectTimelineDuration(project), 3);
 });
 
+test("SRT playback holds the last visual scene through final audio duration", () => {
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:02,000
+Short cue`);
+  const project = makeProject({
+    audioMode: "fullVoSrt",
+    audioDuration: 5,
+    srtCues: cues,
+    scenes: [makeScene({
+      duration: 99,
+      srtCueStartId: cues[0].id,
+      srtCueEndId: cues[0].id,
+      srtCueStartIndex: cues[0].index,
+      srtCueEndIndex: cues[0].index,
+    })],
+  });
+
+  const playback = getScenePlaybackTimings(project);
+
+  assert.equal(playback[0].start, 0);
+  assert.equal(playback[0].end, 5);
+  assert.equal(playback[0].duration, 5);
+});
+
+test("SRT playback keeps unmapped preview scenes sequential", () => {
+  const project = makeProject({
+    audioMode: "fullVoSrt",
+    audioDuration: null,
+    srtCues: [],
+    scenes: [makeScene({duration: 2}), makeScene({duration: 3})],
+  });
+
+  const playback = getScenePlaybackTimings(project);
+
+  assert.equal(playback[0].start, 0);
+  assert.equal(playback[1].start, 2);
+});
+
 test("non-SRT timeline duration uses total scene duration", () => {
   const project = makeProject({
     audioMode: "fullVoEstimated",
@@ -38,6 +76,12 @@ function makeProject(overrides: Partial<CukiProject> = {}): CukiProject {
   return {
     id: "project",
     title: "Test Project",
+    hook: "A strong hook",
+    tagline: "",
+    finalVO: "Caption",
+    youtubeDescription: "",
+    hashtags: "",
+    notes: "",
     aspectRatio: "9:16",
     fps: 30,
     width: 1080,
@@ -45,6 +89,7 @@ function makeProject(overrides: Partial<CukiProject> = {}): CukiProject {
     audioMode: "fullVoEstimated",
     audioUrl: "data:audio/mp3;base64,ok",
     audioDuration: 3,
+    srtRaw: "",
     srtCues: [],
     srtFileName: null,
     globalSubtitleStyle: "cukiBoldMeme",

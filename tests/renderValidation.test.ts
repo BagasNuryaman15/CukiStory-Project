@@ -16,6 +16,16 @@ test("validateForRender blocks missing required assets", () => {
   assert.match(validation.errors.join("\n"), /Scene 1: add subtitle text/);
 });
 
+test("validateForRender blocks missing story package", () => {
+  const validation = validateForRender(makeProject({
+    hook: "",
+    finalVO: "",
+  }));
+
+  assert.match(validation.errors.join("\n"), /Add Final VO/);
+  assert.equal(validation.checklist.some((item) => item.id === "story" && !item.ready), true);
+});
+
 test("validateForRender blocks incomplete SRT mapping", () => {
   const cues = parseSrt(`1
 00:00:00,000 --> 00:00:01,000
@@ -58,6 +68,12 @@ function makeProject(overrides: Partial<CukiProject> = {}): CukiProject {
   return {
     id: "project",
     title: "Test Project",
+    hook: "A strong hook",
+    tagline: "",
+    finalVO: "Caption",
+    youtubeDescription: "",
+    hashtags: "",
+    notes: "",
     aspectRatio: "9:16",
     fps: 30,
     width: 1080,
@@ -65,6 +81,7 @@ function makeProject(overrides: Partial<CukiProject> = {}): CukiProject {
     audioMode: "fullVoEstimated",
     audioUrl: "data:audio/mp3;base64,ok",
     audioDuration: 3,
+    srtRaw: "",
     srtCues: [],
     srtFileName: null,
     globalSubtitleStyle: "cukiBoldMeme",
