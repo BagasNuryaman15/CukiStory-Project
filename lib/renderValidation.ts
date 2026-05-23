@@ -61,15 +61,15 @@ export function getRenderReadinessChecklist(project: CukiProject): RenderReadine
     .map((scene, index) => (!scene.imageUrl ? index + 1 : null))
     .filter((index): index is number => index !== null);
   const finalDuration = getProjectTimelineDuration(project);
-  const hasStoryPackage = Boolean(project.finalVO.trim() || (project.title.trim() && project.hook.trim()));
+  const hasCompleteStoryPackage = Boolean(project.finalVO.trim() && project.title.trim() && project.hook.trim());
 
   return [
     {
       id: "story",
       label: "Story package",
-      ready: hasStoryPackage,
-      required: true,
-      message: "Add Final VO, or at least a title and hook.",
+      ready: hasCompleteStoryPackage,
+      required: false,
+      message: getStoryPackageMessage(project),
     },
     {
       id: "audio",
@@ -136,6 +136,22 @@ function getImagesMessage(missingImageIndexes: number[]) {
   if (missingImageIndexes.length === 1) return `Scene ${missingImageIndexes[0]}: add a panel image.`;
   if (missingImageIndexes.length > 1) return `Add panel images to scenes ${missingImageIndexes.join(", ")}.`;
   return "Add panel images to every scene.";
+}
+
+function getStoryPackageMessage(project: CukiProject) {
+  const missingFinalVo = !project.finalVO.trim();
+  const missingTitleOrHook = !project.title.trim() || !project.hook.trim();
+
+  if (missingFinalVo && missingTitleOrHook) {
+    return "Story Package is incomplete. This will not block MP4 render, but export metadata may be incomplete.";
+  }
+  if (missingFinalVo) {
+    return "Final VO text is missing from Story Package. MP4 render can continue, but Project Pack may be less complete.";
+  }
+  if (missingTitleOrHook) {
+    return "Title or hook is missing. MP4 render can continue, but upload metadata may be incomplete.";
+  }
+  return "Story Package is complete.";
 }
 
 function uniqueMessages(messages: string[]) {

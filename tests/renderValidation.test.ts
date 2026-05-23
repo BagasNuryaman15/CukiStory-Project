@@ -16,13 +16,78 @@ test("validateForRender blocks missing required assets", () => {
   assert.match(validation.errors.join("\n"), /Scene 1: add subtitle text/);
 });
 
-test("validateForRender blocks missing story package", () => {
+test("validateForRender warns for missing story package instead of blocking render", () => {
   const validation = validateForRender(makeProject({
+    title: "",
     hook: "",
     finalVO: "",
   }));
 
-  assert.match(validation.errors.join("\n"), /Add Final VO/);
+  assert.equal(validation.errors.some((error) => /Story Package/.test(error)), false);
+  assert.match(validation.warnings.join("\n"), /Story Package is incomplete/);
+  assert.equal(validation.checklist.some((item) => item.id === "story" && !item.ready && !item.required), true);
+});
+
+test("validateForRender allows technically complete SRT render with empty story package", () => {
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:01,000
+One
+
+2
+00:00:01,000 --> 00:00:02,000
+Two`);
+  const mappedScenes = autoMapSrtToScenes([makeScene({id: "scene-1"}), makeScene({id: "scene-2"})], cues);
+  const validation = validateForRender(makeProject({
+    title: "",
+    hook: "",
+    finalVO: "",
+    audioMode: "fullVoSrt",
+    audioDuration: 2,
+    srtCues: cues,
+    srtFileName: "voice.srt",
+    scenes: mappedScenes,
+  }));
+
+  assert.deepEqual(validation.errors, []);
+  assert.match(validation.warnings.join("\n"), /Story Package is incomplete/);
+});
+
+test("validateForRender warns for missing Final VO without blocking MP4 render", () => {
+  const validation = validateForRender(makeProject({
+    finalVO: "",
+  }));
+
+  assert.equal(validation.errors.some((error) => /Final VO/.test(error)), false);
+  assert.match(validation.warnings.join("\n"), /Final VO text is missing/);
+});
+
+test("validateForRender warns for missing title or hook without blocking MP4 render", () => {
+  const validation = validateForRender(makeProject({
+    title: "",
+    hook: "",
+  }));
+
+  assert.equal(validation.errors.some((error) => /Title|hook/.test(error)), false);
+  assert.match(validation.warnings.join("\n"), /Title or hook is missing/);
+});
+
+test("validateForRender still blocks required technical checks", () => {
+  const validation = validateForRender(makeProject({
+    title: "",
+    hook: "",
+    finalVO: "",
+    audioMode: "fullVoSrt",
+    audioUrl: null,
+    audioDuration: null,
+    srtCues: [],
+    srtFileName: null,
+    scenes: [makeScene({imageUrl: null})],
+  }));
+
+  assert.match(validation.errors.join("\n"), /Upload a VO audio file/);
+  assert.match(validation.errors.join("\n"), /SRT has no valid subtitle cues/);
+  assert.match(validation.errors.join("\n"), /map this scene to SRT cues/);
+  assert.match(validation.errors.join("\n"), /Scene 1: add a panel image/);
   assert.equal(validation.checklist.some((item) => item.id === "story" && !item.ready), true);
 });
 
