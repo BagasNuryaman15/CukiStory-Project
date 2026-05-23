@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {autoMapSrtToScenes, getAssignedSrtCueIds, getSceneSrtCues, getSceneStatus, getSceneVisualTimings, getSceneVoSegment, parseSrt, resetSceneSrtMappings, validateSrtCues} from "../lib/srt";
+import {analyzeSrtMappings, autoMapSrtToScenes, getAssignedSrtCueIds, getSceneSrtCues, getSceneStatus, getSceneVisualTimings, getSceneVoSegment, parseSrt, resetSceneSrtMappings, validateSrtCues} from "../lib/srt";
 import type {CukiScene} from "../lib/types";
 
 test("parseSrt supports comma and dot timestamps and sorts cues by start time", () => {
@@ -101,6 +101,110 @@ Beta`);
   assert.equal(assigned.has(cues[1].id), false);
 });
 
+test("analyzeSrtMappings allows valid sequential mappings without conflicts", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({id: "scene-1", srtCueStartId: cues[0].id, srtCueEndId: cues[0].id}),
+    makeScene({id: "scene-2", srtCueStartId: cues[1].id, srtCueEndId: cues[2].id}),
+  ], cues);
+
+  assert.deepEqual(validation.errors, []);
+  assert.deepEqual(validation.warnings, []);
+  assert.equal(validation.assignedCueCount, cues.length);
+});
+
+test("analyzeSrtMappings errors when a scene has start cue without end cue", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({srtCueStartId: cues[0].id, srtCueEndId: null}),
+  ], cues);
+
+  assert.match(validation.errors.join("\n"), /choose an end SRT cue/);
+});
+
+test("analyzeSrtMappings errors when a scene has end cue without start cue", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({srtCueStartId: null, srtCueEndId: cues[0].id}),
+  ], cues);
+
+  assert.match(validation.errors.join("\n"), /choose a start SRT cue/);
+});
+
+test("analyzeSrtMappings errors when start cue is after end cue", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({srtCueStartId: cues[2].id, srtCueEndId: cues[0].id}),
+  ], cues);
+
+  assert.match(validation.errors.join("\n"), /start cue must come before end cue/);
+});
+
+test("analyzeSrtMappings errors when mapped cue id is not found", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({srtCueStartId: "missing-cue", srtCueEndId: cues[0].id}),
+  ], cues);
+
+  assert.match(validation.errors.join("\n"), /not in the current SRT file/);
+});
+
+test("analyzeSrtMappings warns when cue assignment is duplicated", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({id: "scene-1", srtCueStartId: cues[0].id, srtCueEndId: cues[0].id}),
+    makeScene({id: "scene-2", srtCueStartId: cues[0].id, srtCueEndId: cues[0].id}),
+  ], cues);
+
+  assert.match(validation.warnings.join("\n"), /assigned to more than one scene/);
+});
+
+test("analyzeSrtMappings warns when scene cue ranges overlap", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({id: "scene-1", srtCueStartId: cues[0].id, srtCueEndId: cues[1].id}),
+    makeScene({id: "scene-2", srtCueStartId: cues[1].id, srtCueEndId: cues[2].id}),
+  ], cues);
+
+  assert.match(validation.warnings.join("\n"), /mappings overlap/);
+});
+
+test("analyzeSrtMappings warns when SRT cues are unassigned", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({id: "scene-1", srtCueStartId: cues[0].id, srtCueEndId: cues[0].id}),
+  ], cues);
+
+  assert.match(validation.warnings.join("\n"), /not assigned to any scene/);
+});
+
+test("analyzeSrtMappings warns when scene order does not follow cue order", () => {
+  const cues = makeCues();
+  const validation = analyzeSrtMappings([
+    makeScene({id: "scene-1", srtCueStartId: cues[1].id, srtCueEndId: cues[1].id}),
+    makeScene({id: "scene-2", srtCueStartId: cues[0].id, srtCueEndId: cues[0].id}),
+    makeScene({id: "scene-3", srtCueStartId: cues[2].id, srtCueEndId: cues[2].id}),
+  ], cues);
+
+  assert.match(validation.warnings.join("\n"), /Scene order does not follow SRT cue order/);
+});
+
+test("analyzeSrtMappings warns when mapped scene ranges have a large timing gap", () => {
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:01,000
+One
+
+2
+00:00:05,000 --> 00:00:06,000
+Two`);
+  const validation = analyzeSrtMappings([
+    makeScene({id: "scene-1", srtCueStartId: cues[0].id, srtCueEndId: cues[0].id}),
+    makeScene({id: "scene-2", srtCueStartId: cues[1].id, srtCueEndId: cues[1].id}),
+  ], cues);
+
+  assert.match(validation.warnings.join("\n"), /large timing gap/);
+});
+
 test("autoMapSrtToScenes writes stable cue ids and assigns every cue", () => {
   const cues = parseSrt(`1
 00:00:00,000 --> 00:00:01,000
@@ -160,6 +264,20 @@ Second`);
   assert.equal(visualTimings[1]?.start, 2);
   assert.equal(visualTimings[1]?.shiftedByPrevious, 1);
 });
+
+function makeCues() {
+  return parseSrt(`1
+00:00:00,000 --> 00:00:01,000
+One
+
+2
+00:00:01,000 --> 00:00:02,000
+Two
+
+3
+00:00:02,000 --> 00:00:03,000
+Three`);
+}
 
 function makeScene(overrides: Partial<CukiScene> = {}): CukiScene {
   return {

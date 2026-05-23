@@ -1,6 +1,6 @@
 import type {CukiProject} from "./types";
 import {getDurationDifference, getProjectTimelineDuration} from "./timing";
-import {getAssignedSrtCueIds, getSceneSrtTiming, getSrtDuration, validateSrtCues} from "./srt";
+import {analyzeSrtMappings, getSrtDuration, validateSrtCues} from "./srt";
 import {formatSeconds} from "./utils";
 
 export type RenderValidation = {
@@ -29,6 +29,8 @@ export function validateForRender(project: CukiProject): RenderValidation {
 
   if (project.audioMode === "fullVoSrt") {
     const cues = project.srtCues ?? [];
+    const mappingValidation = analyzeSrtMappings(project.scenes, cues);
+    warnings.push(...mappingValidation.warnings);
     const srtDuration = getSrtDuration(cues);
     if (project.audioDuration && srtDuration > 0) {
       const difference = srtDuration - project.audioDuration;
@@ -54,11 +56,7 @@ export function validateForRender(project: CukiProject): RenderValidation {
 export function getRenderReadinessChecklist(project: CukiProject): RenderReadinessItem[] {
   const cues = project.srtCues ?? [];
   const srtValidation = validateSrtCues(cues);
-  const assigned = getAssignedSrtCueIds(project.scenes, cues);
-  const assignedCueCount = cues.filter((cue) => assigned.has(cue.id)).length;
-  const unmappedScenes = project.audioMode === "fullVoSrt"
-    ? project.scenes.filter((scene) => !getSceneSrtTiming(scene, cues)).length
-    : 0;
+  const mappingValidation = analyzeSrtMappings(project.scenes, cues);
   const missingImageIndexes = project.scenes
     .map((scene, index) => (!scene.imageUrl ? index + 1 : null))
     .filter((index): index is number => index !== null);
@@ -97,9 +95,9 @@ export function getRenderReadinessChecklist(project: CukiProject): RenderReadine
     {
       id: "mapping",
       label: "Scenes mapped",
-      ready: project.audioMode !== "fullVoSrt" || (project.scenes.length > 0 && unmappedScenes === 0 && assignedCueCount === cues.length),
+      ready: project.audioMode !== "fullVoSrt" || (project.scenes.length > 0 && mappingValidation.errors.length === 0),
       required: project.audioMode === "fullVoSrt",
-      message: getMappingMessage(cues.length, assignedCueCount, unmappedScenes),
+      message: mappingValidation.errors[0] ?? getMappingMessage(cues.length, mappingValidation.assignedCueCount, mappingValidation.unmappedSceneCount),
     },
     {
       id: "images",

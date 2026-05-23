@@ -17,6 +17,26 @@ export type SceneVisualTiming = SceneSrtTiming & {
   shiftedByPrevious: number;
 };
 
+export type SrtMappingValidation = {
+  errors: string[];
+  warnings: string[];
+  assignedCueIds: Set<string>;
+  assignedCueCount: number;
+  unmappedSceneCount: number;
+};
+
+type ResolvedCuePosition = {
+  provided: boolean;
+  position: number | null;
+  notFound: boolean;
+};
+
+type ValidSceneCueRange = {
+  sceneIndex: number;
+  start: number;
+  end: number;
+};
+
 const TIMESTAMP_ARROW_LINE = /(.+?)\s*-->\s*(.+)/;
 
 export function parseSrt(srtText: string): SrtCue[] {
@@ -203,6 +223,77 @@ export function getAssignedSrtCueIds(scenes: CukiScene[], cues: SrtCue[] | undef
   return assigned;
 }
 
+export function analyzeSrtMappings(scenes: CukiScene[], cues: SrtCue[] | undefined): SrtMappingValidation {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const assignedCueIds = new Set<string>();
+  const cueUseCounts = new Map<string, number>();
+  const validRanges: ValidSceneCueRange[] = [];
+  let unmappedSceneCount = 0;
+
+  scenes.forEach((scene, sceneIndex) => {
+    const start = resolveSceneCuePosition(scene, "start", cues);
+    const end = resolveSceneCuePosition(scene, "end", cues);
+    const sceneLabel = `Scene ${sceneIndex + 1}`;
+
+    if (!start.provided && !end.provided) {
+      unmappedSceneCount += 1;
+      errors.push(`${sceneLabel}: map this scene to SRT cues.`);
+      return;
+    }
+    if (start.provided && !end.provided) {
+      errors.push(`${sceneLabel}: choose an end SRT cue.`);
+      return;
+    }
+    if (!start.provided && end.provided) {
+      errors.push(`${sceneLabel}: choose a start SRT cue.`);
+      return;
+    }
+    if (start.notFound || end.notFound || start.position == null || end.position == null) {
+      errors.push(`${sceneLabel}: selected SRT cue is not in the current SRT file.`);
+      return;
+    }
+    if (start.position > end.position) {
+      errors.push(`${sceneLabel}: start cue must come before end cue.`);
+      return;
+    }
+
+    validRanges.push({sceneIndex, start: start.position, end: end.position});
+    (cues ?? []).slice(start.position, end.position + 1).forEach((cue) => {
+      assignedCueIds.add(cue.id);
+      cueUseCounts.set(cue.id, (cueUseCounts.get(cue.id) ?? 0) + 1);
+    });
+  });
+
+  if ([...cueUseCounts.values()].some((count) => count > 1)) {
+    warnings.push("Some SRT cues are assigned to more than one scene.");
+  }
+
+  if (hasOverlappingRanges(validRanges)) {
+    warnings.push("Some scene mappings overlap. Review scene cue ranges before rendering.");
+  }
+
+  if ((cues ?? []).some((cue) => !assignedCueIds.has(cue.id))) {
+    warnings.push("Some SRT cues are not assigned to any scene.");
+  }
+
+  if (hasOutOfOrderRanges(validRanges)) {
+    warnings.push("Scene order does not follow SRT cue order. Review cue ranges before rendering.");
+  }
+
+  if (hasLargeGapBetweenMappedRanges(validRanges, cues)) {
+    warnings.push("There is a large timing gap between mapped scene ranges.");
+  }
+
+  return {
+    errors: uniqueMessages(errors),
+    warnings: uniqueMessages(warnings),
+    assignedCueIds,
+    assignedCueCount: (cues ?? []).filter((cue) => assignedCueIds.has(cue.id)).length,
+    unmappedSceneCount,
+  };
+}
+
 export function getSceneStatus(scene: CukiScene, cues: SrtCue[] | undefined, isSrtMode = true): SceneStatus {
   const hasImage = Boolean(scene.imageUrl);
   const hasMapping = isSrtMode ? Boolean(getSceneSrtTiming(scene, cues)) : Boolean(scene.subtitle.trim());
@@ -319,6 +410,70 @@ function compareCueStart(a: SrtCue, b: SrtCue) {
 
 function isValidTimingCue(cue: SrtCue) {
   return Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.end > cue.start && cue.text.trim().length > 0;
+}
+
+function resolveSceneCuePosition(
+  scene: Pick<CukiScene, "srtCueStartId" | "srtCueEndId" | "srtCueStartIndex" | "srtCueEndIndex">,
+  side: "start" | "end",
+  cues: SrtCue[] | undefined,
+): ResolvedCuePosition {
+  const cueId = side === "start" ? scene.srtCueStartId : scene.srtCueEndId;
+  if (cueId) {
+    const position = cues?.findIndex((cue) => cue.id === cueId) ?? -1;
+    return {
+      provided: true,
+      position: position === -1 ? null : position,
+      notFound: position === -1,
+    };
+  }
+
+  const legacyIndex = side === "start" ? scene.srtCueStartIndex : scene.srtCueEndIndex;
+  if (legacyIndex == null) {
+    return {provided: false, position: null, notFound: false};
+  }
+
+  const matchingPositions = (cues ?? [])
+    .map((cue, position) => (cue.index === legacyIndex ? position : null))
+    .filter((position): position is number => position !== null);
+  const position = side === "start" ? matchingPositions[0] : matchingPositions.at(-1);
+
+  return {
+    provided: true,
+    position: position ?? null,
+    notFound: position == null,
+  };
+}
+
+function hasOverlappingRanges(ranges: ValidSceneCueRange[]) {
+  const sortedRanges = [...ranges].sort((a, b) => a.start - b.start);
+  return sortedRanges.some((range, index) => {
+    const previous = sortedRanges[index - 1];
+    return Boolean(previous && range.start <= previous.end);
+  });
+}
+
+function hasOutOfOrderRanges(ranges: ValidSceneCueRange[]) {
+  return ranges.some((range, index) => {
+    const previous = ranges[index - 1];
+    return Boolean(previous && range.start < previous.start);
+  });
+}
+
+function hasLargeGapBetweenMappedRanges(ranges: ValidSceneCueRange[], cues: SrtCue[] | undefined) {
+  return ranges.some((range, index) => {
+    const previous = ranges[index - 1];
+    if (!previous || !cues) return false;
+
+    const previousEndCue = cues[previous.end];
+    const nextStartCue = cues[range.start];
+    if (!previousEndCue || !nextStartCue || !Number.isFinite(previousEndCue.end) || !Number.isFinite(nextStartCue.start)) return false;
+
+    return nextStartCue.start - previousEndCue.end > 2.5;
+  });
+}
+
+function uniqueMessages(messages: string[]) {
+  return [...new Set(messages)];
 }
 
 function hashCueText(text: string) {

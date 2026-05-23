@@ -26,7 +26,7 @@ test("validateForRender blocks missing story package", () => {
   assert.equal(validation.checklist.some((item) => item.id === "story" && !item.ready), true);
 });
 
-test("validateForRender blocks incomplete SRT mapping", () => {
+test("validateForRender warns when some SRT cues are unassigned", () => {
   const cues = parseSrt(`1
 00:00:00,000 --> 00:00:01,000
 One
@@ -41,7 +41,56 @@ Two`);
     scenes: [makeScene({srtCueStartId: cues[0].id, srtCueEndId: cues[0].id})],
   }));
 
-  assert.match(validation.errors.join("\n"), /Assign 1 remaining SRT cue/);
+  assert.equal(validation.errors.some((error) => /Assign 1 remaining SRT cue/.test(error)), false);
+  assert.match(validation.warnings.join("\n"), /Some SRT cues are not assigned to any scene/);
+});
+
+test("validateForRender blocks invalid SRT scene mappings", () => {
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:01,000
+One
+
+2
+00:00:01,000 --> 00:00:02,000
+Two`);
+  const validation = validateForRender(makeProject({
+    audioMode: "fullVoSrt",
+    audioDuration: 2,
+    srtCues: cues,
+    srtFileName: "voice.srt",
+    scenes: [makeScene({srtCueStartId: cues[0].id, srtCueEndId: null})],
+  }));
+
+  assert.match(validation.errors.join("\n"), /choose an end SRT cue/);
+  assert.equal(validation.checklist.some((item) => item.id === "mapping" && !item.ready && item.required), true);
+});
+
+test("validateForRender warns about duplicate or overlapping SRT mappings", () => {
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:01,000
+One
+
+2
+00:00:01,000 --> 00:00:02,000
+Two
+
+3
+00:00:02,000 --> 00:00:03,000
+Three`);
+  const validation = validateForRender(makeProject({
+    audioMode: "fullVoSrt",
+    audioDuration: 3,
+    srtCues: cues,
+    srtFileName: "voice.srt",
+    scenes: [
+      makeScene({id: "scene-1", srtCueStartId: cues[0].id, srtCueEndId: cues[1].id}),
+      makeScene({id: "scene-2", srtCueStartId: cues[1].id, srtCueEndId: cues[2].id}),
+    ],
+  }));
+
+  assert.deepEqual(validation.errors, []);
+  assert.match(validation.warnings.join("\n"), /assigned to more than one scene/);
+  assert.match(validation.warnings.join("\n"), /mappings overlap/);
 });
 
 test("validateForRender blocks invalid SRT cues that were preserved by the parser", () => {
