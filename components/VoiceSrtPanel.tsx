@@ -2,7 +2,7 @@
 
 import {useRef, useState} from "react";
 import type {AudioMode, CukiProject} from "@/lib/types";
-import {autoMapSrtToScenes, formatShortTimestamp, getAssignedSrtCueIds, getSrtDuration, parseSrt, validateSrtCues} from "@/lib/srt";
+import {autoMapSrtToScenes, formatShortTimestamp, getAssignedSrtCueIds, getSrtDuration, parseSrt, resetSceneSrtMappings, validateSrtCues} from "@/lib/srt";
 import {formatSeconds, reorderScenes} from "@/lib/utils";
 import {AudioUploader} from "./AudioUploader";
 import {DurationSummary} from "./DurationSummary";
@@ -30,6 +30,7 @@ export function VoiceSrtPanel({project, onChange}: {project: CukiProject; onChan
         srtRaw: text,
         srtCues: cues,
         srtFileName: file.name,
+        scenes: resetSceneSrtMappings(project.scenes),
       });
       if (cues.length === 0) {
         setSrtError("No valid SRT cues were found. Check the exported .srt file and encoding.");

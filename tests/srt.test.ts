@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {autoMapSrtToScenes, getAssignedSrtCueIds, getSceneSrtCues, getSceneStatus, getSceneVisualTimings, getSceneVoSegment, parseSrt, validateSrtCues} from "../lib/srt";
+import {autoMapSrtToScenes, getAssignedSrtCueIds, getSceneSrtCues, getSceneStatus, getSceneVisualTimings, getSceneVoSegment, parseSrt, resetSceneSrtMappings, validateSrtCues} from "../lib/srt";
 import type {CukiScene} from "../lib/types";
 
 test("parseSrt supports comma and dot timestamps and sorts cues by start time", () => {
@@ -33,6 +33,49 @@ Second`);
 
   assert.equal(validation.isValid, false);
   assert.match(validation.errors.map((error) => error.message).join("\n"), /overlaps/);
+});
+
+test("parseSrt preserves invalid cues so validation can report them", () => {
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:01,000
+Valid
+
+2
+not-a-time --> 00:00:02,000
+Invalid start
+
+3
+00:00:03,000 --> 00:00:04,000
+`);
+  const validation = validateSrtCues(cues);
+  const messages = validation.errors.map((error) => error.message).join("\n");
+
+  assert.equal(cues.length, 3);
+  assert.equal(validation.isValid, false);
+  assert.match(messages, /Cue 2 has an invalid timestamp/);
+  assert.match(messages, /Cue 3 has empty subtitle text/);
+});
+
+test("resetSceneSrtMappings clears stale cue ids and legacy indexes when SRT is replaced", () => {
+  const scenes = resetSceneSrtMappings([
+    makeScene({
+      srtCueStartId: "old-start",
+      srtCueEndId: "old-end",
+      srtCueStartIndex: 1,
+      srtCueEndIndex: 3,
+      manualDurationOverride: true,
+      timingSource: "synced",
+      imageUrl: "data:image/png;base64,keep",
+    }),
+  ]);
+
+  assert.equal(scenes[0].srtCueStartId, null);
+  assert.equal(scenes[0].srtCueEndId, null);
+  assert.equal(scenes[0].srtCueStartIndex, null);
+  assert.equal(scenes[0].srtCueEndIndex, null);
+  assert.equal(scenes[0].manualDurationOverride, false);
+  assert.equal(scenes[0].timingSource, "estimated");
+  assert.equal(scenes[0].imageUrl, "data:image/png;base64,keep");
 });
 
 test("id-based mapping does not over-select duplicate SRT file indexes", () => {

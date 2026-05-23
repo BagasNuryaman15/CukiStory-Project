@@ -17,7 +17,7 @@ export type SceneVisualTiming = SceneSrtTiming & {
   shiftedByPrevious: number;
 };
 
-const TIMESTAMP_LINE = /(\d{1,2}:\d{2}:\d{2}[,.]\d{1,3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,.]\d{1,3})/;
+const TIMESTAMP_ARROW_LINE = /(.+?)\s*-->\s*(.+)/;
 
 export function parseSrt(srtText: string): SrtCue[] {
   const normalized = srtText.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
@@ -26,8 +26,7 @@ export function parseSrt(srtText: string): SrtCue[] {
   return normalized
     .split(/\n{2,}/)
     .flatMap((block, blockIndex) => parseSrtBlock(block, blockIndex))
-    .filter((cue) => cue.end > cue.start && cue.text.length > 0)
-    .sort((a, b) => a.start - b.start)
+    .sort(compareCueStart)
     .map((cue, index) => ({...cue, id: createStableCueId(cue, index)}));
 }
 
@@ -65,7 +64,8 @@ export function formatShortTimestamp(seconds: number): string {
 
 export function getSrtDuration(cues: SrtCue[] | undefined) {
   if (!cues || cues.length === 0) return 0;
-  return Math.max(...cues.map((cue) => cue.end));
+  const validEnds = cues.map((cue) => cue.end).filter((end) => Number.isFinite(end));
+  return validEnds.length > 0 ? Math.max(...validEnds) : 0;
 }
 
 export function validateSrtCues(cues: SrtCue[] | undefined): SrtValidationResult {
@@ -90,6 +90,10 @@ export function validateSrtCues(cues: SrtCue[] | undefined): SrtValidationResult
 
     const previousCue = cues[index - 1];
     if (!previousCue) return;
+
+    if (!Number.isFinite(cue.start) || !Number.isFinite(cue.end) || !Number.isFinite(previousCue.start) || !Number.isFinite(previousCue.end)) {
+      return;
+    }
 
     if (cue.start < previousCue.start) {
       errors.push({message: `Cue ${cue.index} starts before the previous cue.`, cueId: cue.id});
@@ -140,6 +144,7 @@ export function getSceneSrtCues(scene: Pick<CukiScene, "srtCueStartId" | "srtCue
 export function getSceneSrtTiming(scene: CukiScene, cues: SrtCue[] | undefined): SceneSrtTiming | null {
   const sceneCues = getSceneSrtCues(scene, cues);
   if (sceneCues.length === 0) return null;
+  if (sceneCues.some((cue) => !isValidTimingCue(cue))) return null;
 
   const baseStart = Math.min(...sceneCues.map((cue) => cue.start));
   const baseEnd = Math.max(...sceneCues.map((cue) => cue.end));
@@ -213,9 +218,10 @@ export function getSceneVoSegment(scene: CukiScene, cues: SrtCue[] | undefined) 
 }
 
 export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {
-  if (scenes.length === 0 || cues.length === 0) return scenes;
+  const validCues = cues.filter(isValidTimingCue);
+  if (scenes.length === 0 || validCues.length === 0) return scenes;
 
-  const sortedCues = [...cues].sort((a, b) => a.start - b.start);
+  const sortedCues = [...validCues].sort((a, b) => a.start - b.start);
   const firstStart = sortedCues[0].start;
   const totalDuration = Math.max(0.1, sortedCues[sortedCues.length - 1].end - firstStart);
   let cuePointer = 0;
@@ -262,20 +268,30 @@ export function autoMapSrtToScenes(scenes: CukiScene[], cues: SrtCue[]) {
   });
 }
 
+export function resetSceneSrtMappings(scenes: CukiScene[]): CukiScene[] {
+  return scenes.map((scene) => ({
+    ...scene,
+    srtCueStartId: null,
+    srtCueEndId: null,
+    srtCueStartIndex: null,
+    srtCueEndIndex: null,
+    manualDurationOverride: false,
+    timingSource: "estimated" as const,
+  }));
+}
+
 function parseSrtBlock(block: string, blockIndex: number): SrtCue[] {
   const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
-  const timingLineIndex = lines.findIndex((line) => TIMESTAMP_LINE.test(line));
+  const timingLineIndex = lines.findIndex((line) => TIMESTAMP_ARROW_LINE.test(line));
   if (timingLineIndex === -1) return [];
 
-  const timing = lines[timingLineIndex].match(TIMESTAMP_LINE);
+  const timing = lines[timingLineIndex].match(TIMESTAMP_ARROW_LINE);
   if (!timing) return [];
 
   const indexFromFile = timingLineIndex > 0 && /^\d+$/.test(lines[timingLineIndex - 1]) ? Number(lines[timingLineIndex - 1]) : blockIndex + 1;
   const start = parseSrtTimestamp(timing[1]);
   const end = parseSrtTimestamp(timing[2]);
   const text = lines.slice(timingLineIndex + 1).join("\n").trim();
-
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return [];
 
   return [{
     id: "",
@@ -287,9 +303,22 @@ function parseSrtBlock(block: string, blockIndex: number): SrtCue[] {
 }
 
 function createStableCueId(cue: SrtCue, position: number) {
-  const start = Math.round(cue.start * 1000);
-  const end = Math.round(cue.end * 1000);
+  const start = Number.isFinite(cue.start) ? Math.round(cue.start * 1000) : "invalid";
+  const end = Number.isFinite(cue.end) ? Math.round(cue.end * 1000) : "invalid";
   return `srt-cue-${position + 1}-${start}-${end}-${hashCueText(cue.text)}`;
+}
+
+function compareCueStart(a: SrtCue, b: SrtCue) {
+  const aIsFinite = Number.isFinite(a.start);
+  const bIsFinite = Number.isFinite(b.start);
+  if (aIsFinite && bIsFinite) return a.start - b.start;
+  if (aIsFinite) return -1;
+  if (bIsFinite) return 1;
+  return 0;
+}
+
+function isValidTimingCue(cue: SrtCue) {
+  return Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.end > cue.start && cue.text.trim().length > 0;
 }
 
 function hashCueText(text: string) {

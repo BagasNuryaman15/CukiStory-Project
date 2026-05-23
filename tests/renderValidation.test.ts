@@ -44,6 +44,26 @@ Two`);
   assert.match(validation.errors.join("\n"), /Assign 1 remaining SRT cue/);
 });
 
+test("validateForRender blocks invalid SRT cues that were preserved by the parser", () => {
+  const cues = parseSrt(`1
+00:00:00,000 --> 00:00:01,000
+One
+
+2
+bad-time --> 00:00:02,000
+Two`);
+  const mappedScenes = autoMapSrtToScenes([makeScene({id: "scene-1"})], cues);
+  const validation = validateForRender(makeProject({
+    audioMode: "fullVoSrt",
+    audioDuration: 2,
+    srtCues: cues,
+    srtFileName: "voice.srt",
+    scenes: mappedScenes,
+  }));
+
+  assert.match(validation.errors.join("\n"), /Cue 2 has an invalid timestamp/);
+});
+
 test("validateForRender allows complete SRT projects", () => {
   const cues = parseSrt(`1
 00:00:00,000 --> 00:00:01,000
