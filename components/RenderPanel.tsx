@@ -4,6 +4,7 @@ import {useEffect, useMemo, useState} from "react";
 import {createPortal} from "react-dom";
 import type {CukiProject} from "@/lib/types";
 import {createProjectExportPack} from "@/lib/exportPack";
+import {createRenderRequestBody, estimateRenderPayload} from "@/lib/renderPayload";
 import {getProjectTimelineDuration} from "@/lib/timing";
 import {validateForRender} from "@/lib/renderValidation";
 import {downloadBlob, formatSeconds} from "@/lib/utils";
@@ -15,6 +16,7 @@ export function RenderPanel({project, onSave}: {project: CukiProject; onSave: ()
   const validation = validateForRender(project);
   const hasBlockingErrors = validation.errors.length > 0;
   const renderEstimate = useMemo(() => getRenderEstimate(project), [project]);
+  const payloadEstimate = useMemo(() => estimateRenderPayload(project), [project]);
 
   useEffect(() => {
     if (!isRendering) return;
@@ -34,24 +36,25 @@ export function RenderPanel({project, onSave}: {project: CukiProject; onSave: ()
     onSave();
     setIsRendering(true);
     setElapsedSeconds(0);
-    setStatus("Preparing render bundle.");
+    setStatus(payloadEstimate.isLarge ? `Preparing render bundle. Payload is about ${payloadEstimate.label}.` : "Preparing render bundle.");
     try {
+      const requestBody = createRenderRequestBody(project);
       const response = await fetch("/api/render", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({project}),
+        body: requestBody,
       });
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({error: "Render failed"}));
-        throw new Error(payload.error ?? "Render failed");
+        throw new Error(getRenderResponseErrorMessage(response.status, payload.error, payloadEstimate.label));
       }
 
       const blob = await response.blob();
       downloadBlob(blob, `${safeFilename(project.title)}.mp4`);
       setStatus("Render complete. MP4 download started.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Render failed.");
+      setStatus(getRenderFailureMessage(error, payloadEstimate.label));
     } finally {
       setIsRendering(false);
     }
@@ -107,6 +110,15 @@ export function RenderPanel({project, onSave}: {project: CukiProject; onSave: ()
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
             {validation.warnings.map((warning) => <li key={warning}>{warning}</li>)}
           </ul>
+        </div>
+      ) : null}
+
+      {payloadEstimate.isLarge ? (
+        <div className="soft-warning mt-5 rounded-2xl p-4">
+          <p className="font-extrabold">Render payload note</p>
+          <p className="mt-2 text-sm">
+            This MVP sends session media to the local render API in one request. Current payload is about {payloadEstimate.label}; if render fails, try shorter audio or smaller scene images.
+          </p>
         </div>
       ) : null}
 
@@ -214,6 +226,23 @@ function getRenderEstimate(project: CukiProject) {
   const sceneWeight = Math.max(1, project.scenes.length) * 1.4;
   const durationWeight = Math.max(8, videoDuration * 1.8);
   return Math.min(240, Math.max(24, Math.round(durationWeight + sceneWeight)));
+}
+
+function getRenderResponseErrorMessage(status: number, serverMessage: string | undefined, payloadSize: string) {
+  if (status === 413) {
+    return `Render request is too large for the local API. Current payload is about ${payloadSize}; try smaller image files or shorter audio.`;
+  }
+  return serverMessage ?? `Render failed while sending a ${payloadSize} payload.`;
+}
+
+function getRenderFailureMessage(error: unknown, payloadSize: string) {
+  if (error instanceof Error) {
+    if (/failed to fetch|networkerror|load failed/i.test(error.message)) {
+      return `Render request could not reach the local API. Current payload is about ${payloadSize}; large audio/images can make this MVP request fragile.`;
+    }
+    return error.message;
+  }
+  return `Render failed while sending a ${payloadSize} payload.`;
 }
 
 function safeFilename(input: string) {
