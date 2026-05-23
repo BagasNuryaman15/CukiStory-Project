@@ -3,6 +3,7 @@
 import {useEffect, useState} from "react";
 import type {AudioMode, CukiScene, SrtCue} from "@/lib/types";
 import {transitionDurations} from "@/lib/presets";
+import {clearSceneImageSessionMedia, storeSceneImageSessionMedia} from "@/lib/sessionMedia";
 import {formatShortTimestamp, getSceneSrtCueRange, getSceneSrtCues, getSceneSrtTiming, getSceneStatus, getSceneVoSegment} from "@/lib/srt";
 import type {SceneVisualTiming} from "@/lib/srt";
 import {fileToDataUrl, formatSeconds} from "@/lib/utils";
@@ -11,6 +12,7 @@ import {TransitionPicker} from "./TransitionPicker";
 
 type SceneCardProps = {
   scene: CukiScene;
+  projectId: string;
   index: number;
   isFirst: boolean;
   isLast: boolean;
@@ -24,7 +26,7 @@ type SceneCardProps = {
   visualTiming?: SceneVisualTiming | null;
 };
 
-export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate, onDelete, onMoveUp, onMoveDown, audioMode, srtCues = [], visualTiming}: SceneCardProps) {
+export function SceneCard({scene, projectId, index, isFirst, isLast, onChange, onDuplicate, onDelete, onMoveUp, onMoveDown, audioMode, srtCues = [], visualTiming}: SceneCardProps) {
   const isSrtMode = audioMode === "fullVoSrt";
   const srtTiming = isSrtMode ? visualTiming ?? getSceneSrtTiming(scene, srtCues) : null;
   const mappedCues = isSrtMode ? getSceneSrtCues(scene, srtCues) : [];
@@ -41,6 +43,7 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
     if (!file) return;
     try {
       const imageUrl = await fileToDataUrl(file);
+      storeSceneImageSessionMedia(projectId, scene.id, imageUrl);
       onChange({...scene, imageUrl});
     } catch {
       alert("Image failed to load. Try png, jpg, jpeg, or webp.");
@@ -108,7 +111,14 @@ export function SceneCard({scene, index, isFirst, isLast, onChange, onDuplicate,
             <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={(event) => handleImage(event.target.files?.[0])} />
           </label>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button onClick={() => onChange({...scene, imageUrl: null})} disabled={!scene.imageUrl} className="btn-quiet px-3 py-2 text-sm">
+            <button
+              onClick={() => {
+                clearSceneImageSessionMedia(projectId, scene.id);
+                onChange({...scene, imageUrl: null});
+              }}
+              disabled={!scene.imageUrl}
+              className="btn-quiet px-3 py-2 text-sm"
+            >
               Remove Image
             </button>
             <button onClick={() => document.getElementById(`scene-image-${scene.id}`)?.click()} className="btn-secondary px-3 py-2 text-sm">

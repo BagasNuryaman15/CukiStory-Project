@@ -11,6 +11,7 @@ import {VoiceSrtPanel} from "./VoiceSrtPanel";
 import type {CukiProject} from "@/lib/types";
 import {autoDistributeDurations, normalizeDurations} from "@/lib/timing";
 import {getProject, saveProject} from "@/lib/storage";
+import {rehydrateProjectSessionMedia} from "@/lib/sessionMedia";
 import {templates} from "@/lib/presets";
 import {validateForRender} from "@/lib/renderValidation";
 import {reorderScenes} from "@/lib/utils";
@@ -24,7 +25,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
 
   useEffect(() => {
     const loaded = getProject(projectId);
-    setProject(loaded);
+    setProject(loaded ? rehydrateProjectSessionMedia(loaded) : null);
     setSaveStatus(loaded ? "Loaded" : "Project not found");
     setHasLoaded(true);
   }, [projectId]);
@@ -130,7 +131,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
 
       {storageError ? <div className="mb-5 rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{storageError}</div> : null}
       <div className="guidance-card mb-5 rounded-2xl p-4 text-sm">
-        Files are session-only in this MVP. Project metadata, SRT cues, mappings, style, timing, effects, and transitions are saved locally; re-select image/audio files after refresh if needed.
+        Media is available during this browser session. Project metadata, SRT cues, mappings, style, timing, effects, and transitions are saved locally; after refresh, audio/images may need to be selected again.
       </div>
 
       <StepNav activeStep={activeStep} project={project} onChange={setActiveStep} />
@@ -157,6 +158,7 @@ export function ProjectEditor({projectId}: {projectId: string}) {
             >
               <SceneEditor
                 scenes={project.scenes}
+                projectId={project.id}
                 sceneDefaults={{subtitleStyle: project.globalSubtitleStyle, transition: project.globalTransition, effect: project.globalImageEffect}}
                 audioMode={project.audioMode}
                 srtCues={project.srtCues ?? []}

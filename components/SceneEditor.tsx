@@ -2,18 +2,21 @@
 
 import type {AudioMode, CukiScene, ImageEffect, SrtCue, SubtitleStyle, TransitionType} from "@/lib/types";
 import {createScene} from "@/lib/storage";
+import {clearSceneImageSessionMedia, storeSceneImageSessionMedia} from "@/lib/sessionMedia";
 import {autoMapSrtToScenes, getAssignedSrtCueIds, getSceneStatus, getSceneVisualTimings} from "@/lib/srt";
 import {createId, formatSeconds, reorderScenes} from "@/lib/utils";
 import {SceneCard} from "./SceneCard";
 
 export function SceneEditor({
   scenes,
+  projectId,
   onChange,
   sceneDefaults,
   audioMode,
   srtCues = [],
 }: {
   scenes: CukiScene[];
+  projectId: string;
   onChange: (scenes: CukiScene[]) => void;
   sceneDefaults?: {
     subtitleStyle: SubtitleStyle;
@@ -39,10 +42,12 @@ export function SceneEditor({
 
   function duplicateScene(index: number) {
     const copy = {...scenes[index], id: createId("scene"), order: index + 2};
+    if (copy.imageUrl) storeSceneImageSessionMedia(projectId, copy.id, copy.imageUrl);
     onChange(reorderScenes([...scenes.slice(0, index + 1), copy, ...scenes.slice(index + 1)]));
   }
 
   function deleteScene(index: number) {
+    clearSceneImageSessionMedia(projectId, scenes[index].id);
     onChange(reorderScenes(scenes.filter((_, itemIndex) => itemIndex !== index)));
   }
 
@@ -130,6 +135,7 @@ export function SceneEditor({
               onDelete={() => deleteScene(index)}
               onMoveUp={() => moveScene(index, -1)}
               onMoveDown={() => moveScene(index, 1)}
+              projectId={projectId}
               audioMode={audioMode}
               srtCues={srtCues}
               visualTiming={visualTimings[index]}

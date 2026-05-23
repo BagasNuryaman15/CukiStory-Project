@@ -2,6 +2,7 @@
 
 import {useRef, useState} from "react";
 import type {AudioMode, CukiProject} from "@/lib/types";
+import {storeProjectAudioSessionMedia} from "@/lib/sessionMedia";
 import {autoMapSrtToScenes, formatShortTimestamp, getAssignedSrtCueIds, getSrtDuration, parseSrt, resetSceneSrtMappings, validateSrtCues} from "@/lib/srt";
 import {formatSeconds, reorderScenes} from "@/lib/utils";
 import {AudioUploader} from "./AudioUploader";
@@ -85,7 +86,10 @@ export function VoiceSrtPanel({project, onChange}: {project: CukiProject; onChan
       <AudioUploader
         audioUrl={project.audioUrl}
         audioDuration={project.audioDuration}
-        onAudioChange={(audioUrl, audioDuration) => onChange({...project, audioUrl, audioDuration})}
+        onAudioChange={(audioUrl, audioDuration) => {
+          storeProjectAudioSessionMedia(project.id, audioUrl, audioDuration);
+          onChange({...project, audioUrl, audioDuration});
+        }}
       />
 
       <section className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
