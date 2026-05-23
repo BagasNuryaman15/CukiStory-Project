@@ -12,6 +12,8 @@ import type {CukiProject} from "@/lib/types";
 import {autoDistributeDurations, normalizeDurations} from "@/lib/timing";
 import {getProject, saveProject} from "@/lib/storage";
 import {rehydrateProjectSessionMedia} from "@/lib/sessionMedia";
+import {getStepReadiness} from "@/lib/stepReadiness";
+import type {EditorStep, StepReadinessStatus} from "@/lib/stepReadiness";
 import {templates} from "@/lib/presets";
 import {validateForRender} from "@/lib/renderValidation";
 import {reorderScenes} from "@/lib/utils";
@@ -242,8 +244,6 @@ export function ProjectEditor({projectId}: {projectId: string}) {
   );
 }
 
-type EditorStep = "story" | "voice" | "scenes" | "style" | "preview";
-
 const steps: Array<{id: EditorStep; label: string; description: string}> = [
   {id: "story", label: "Story", description: "VO and metadata"},
   {id: "voice", label: "Audio & SRT", description: "Timing source"},
@@ -279,19 +279,22 @@ function StepNav({activeStep, project, onChange}: {activeStep: EditorStep; proje
 }
 
 function StepStatus({step, project}: {step: EditorStep; project: CukiProject}) {
-  const ready = {
-    story: Boolean(project.finalVO.trim() || (project.title.trim() && project.hook.trim())),
-    scenes: project.scenes.length > 0,
-    voice: project.audioMode === "fullVoSrt" ? Boolean(project.audioDuration && project.srtCues?.length) : Boolean(project.audioDuration),
-    style: true,
-    preview: project.scenes.length > 0 && Boolean(project.audioDuration),
-  }[step];
+  const readiness = getStepReadiness(project, step);
 
   return (
-    <span className={`rounded-full px-2.5 py-1 text-[0.68rem] font-extrabold ${ready ? "bg-emerald-400/15 text-emerald-200" : "bg-white/10 text-studio-muted"}`}>
-      {ready ? "Ready" : "Setup"}
+    <span className={`rounded-full px-2.5 py-1 text-[0.68rem] font-extrabold ${getStepStatusClass(readiness.status)}`}>
+      {readiness.label}
     </span>
   );
+}
+
+function getStepStatusClass(status: StepReadinessStatus) {
+  return {
+    notStarted: "bg-white/10 text-studio-muted",
+    inProgress: "bg-studio-cyan/10 text-cyan-100",
+    needsAttention: "bg-amber-400/15 text-amber-100",
+    ready: "bg-emerald-400/15 text-emerald-200",
+  }[status];
 }
 
 function StepShell({
